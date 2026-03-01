@@ -2,7 +2,7 @@
 const express = require("express");
 const router = express.Router();
 
-const { GoogleGenAI } = require("@google/genai");
+const { GoogleGenerativeAI } = require("@google/generative-ai");
 
 // NOTE: dotenv is loaded in server.js already.
 // Keeping this file clean avoids double-loading.
@@ -11,7 +11,7 @@ if (!apiKey) {
   throw new Error("Missing GEMINI_API_KEY in environment");
 }
 
-const client = new GoogleGenAI({ apiKey });
+const client = new GoogleGenerativeAI(apiKey);
 
 function extractGeminiText(result) {
   // Common shape: result.response.text() OR result.text()
