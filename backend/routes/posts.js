@@ -5,7 +5,19 @@ const { executeQuery } = require('../services/snowflake');
 // Get posts with sorting
 router.get('/', async (req, res) => {
   try {
-    const { sortBy = 'recommendation', userId, userLat, userLng } = req.query;
+    const { sortBy = 'recommendation', userLat, userLng } = req.query;
+
+    const lat = parseFloat(userLat) || 0;
+    const lng = parseFloat(userLng) || 0;
+
+    // Haversine formula inline — works in plain Snowflake SQL
+    const distanceExpr = `
+      3959 * ACOS(
+        LEAST(1.0, COS(RADIANS(${lat})) * COS(RADIANS(p.START_LAT)) *
+        COS(RADIANS(p.START_LNG) - RADIANS(${lng})) +
+        SIN(RADIANS(${lat})) * SIN(RADIANS(p.START_LAT)))
+      )
+    `;
 
     let query = `
       SELECT 
@@ -14,13 +26,12 @@ router.get('/', async (req, res) => {
         u.AGE,
         u.GENDER,
         u.PROFILE_IMAGE,
-        EARTH_DISTANCE(p.START_LAT, p.START_LNG, ?, ?) as distance
+        ${distanceExpr} AS DISTANCE
       FROM POSTS p
       JOIN USERS u ON p.USER_ID = u.ID
       WHERE p.IS_ACTIVE = TRUE
     `;
 
-    // Add sorting
     switch (sortBy) {
       case 'gender':
         query += ' ORDER BY u.GENDER';
@@ -32,14 +43,14 @@ router.get('/', async (req, res) => {
         query += ' ORDER BY p.CREATED_AT ASC';
         break;
       case 'closest':
-        query += ` ORDER BY EARTH_DISTANCE(p.START_LAT, p.START_LNG, ${userLat}, ${userLng}) ASC`;
+        query += ` ORDER BY ${distanceExpr} ASC`;
         break;
       case 'recommendation':
       default:
         query += ' ORDER BY p.RECOMMENDATION_SCORE DESC';
     }
 
-    const results = await executeQuery(query, [userLat, userLng]);
+    const results = await executeQuery(query, []);
     res.json(results);
   } catch (error) {
     console.error('Error fetching posts:', error);
