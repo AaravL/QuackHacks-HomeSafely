@@ -3,9 +3,8 @@ const express = require("express");
 const router = express.Router();
 
 const { GoogleGenAI } = require("@google/genai");
+require("dotenv").config();
 
-// NOTE: dotenv is loaded in server.js already.
-// Keeping this file clean avoids double-loading.
 const apiKey = process.env.GEMINI_API_KEY;
 if (!apiKey) {
   throw new Error("Missing GEMINI_API_KEY in environment");
@@ -14,7 +13,6 @@ if (!apiKey) {
 const client = new GoogleGenAI({ apiKey });
 
 function extractGeminiText(result) {
-  // Common shape: result.response.text() OR result.text()
   if (result?.response?.text) {
     try {
       return typeof result.response.text === "function"
@@ -29,7 +27,6 @@ function extractGeminiText(result) {
     } catch {}
   }
 
-  // Fallback: candidates parts
   const parts =
     result?.candidates?.[0]?.content?.parts ||
     result?.response?.candidates?.[0]?.content?.parts;
@@ -50,7 +47,7 @@ router.post("/chat", async (req, res) => {
       return res.status(400).json({ error: "message is required" });
     }
 
-    const model = process.env.GEMINI_MODEL || "gemini-2.5-flash";
+    const model = "gemini-2.5-flash";
 
     const systemInstruction = `
 You are a warm "walk-home phone companion" speaking in a caring-parent tone.
@@ -67,8 +64,8 @@ Mode: ${mode}
     // Normalize history to Gemini roles: "user" or "model"
     const contents = Array.isArray(history)
       ? history.slice(-12).map((h) => ({
-          role: h?.role === "assistant" || h?.role === "model" ? "model" : "user",
-          parts: [{ text: String(h?.text ?? h?.content ?? h?.message ?? "") }],
+          role: h?.role === "assistant" ? "model" : "user",
+          parts: [{ text: String(h?.text ?? "") }],
         }))
       : [];
 

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { Shield } from "lucide-react"
+
 import { BottomNav } from "@/components/bottom-nav"
 import { TripFeed } from "@/components/trip-feed"
 import { CreateTrip } from "@/components/create-trip"
@@ -9,6 +10,8 @@ import { MessagesList } from "@/components/messages-list"
 import { ChatView } from "@/components/chat-view"
 import { UserProfile } from "@/components/user-profile"
 import { AuthPage } from "@/components/auth-page"
+import { CompanionChat } from "@/components/companion-chat"
+
 import { useAppStore } from "@/lib/store"
 import { useAuth } from "@/lib/auth-context"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -49,19 +52,46 @@ export default function HomePage() {
     return <AuthPage onLoginSuccess={login} />
   }
 
+  const showHeader = !(activeTab === "messages" && activeChatId)
+
   return (
     <main className="relative mx-auto flex min-h-dvh max-w-md flex-col bg-background">
       {/* Scrollable content area */}
       <ScrollArea className="flex-1">
         <div className="flex flex-col gap-2 px-4 pb-24 pt-4">
-          {/* Show app header except in chat view */}
-          {!(activeTab === "messages" && activeChatId) && <AppHeader />}
+          {showHeader && <AppHeader />}
 
+          {/* Dev-only: see what tab is actually active */}
+          {process.env.NODE_ENV !== "production" && (
+            <div className="text-[11px] text-muted-foreground">
+              activeTab: <span className="text-foreground">{String(activeTab)}</span>
+              {activeChatId ? (
+                <>
+                  {" "}
+                  | activeChatId: <span className="text-foreground">{String(activeChatId)}</span>
+                </>
+              ) : null}
+            </div>
+          )}
+
+          {/* Tabs */}
           {activeTab === "feed" && <TripFeed />}
           {activeTab === "create" && <CreateTrip />}
           {activeTab === "messages" && !activeChatId && <MessagesList />}
           {activeTab === "messages" && activeChatId && <ChatView />}
+          {activeTab === "companion" && <CompanionChat />}
           {activeTab === "profile" && <UserProfile />}
+
+          {/* Fallback to prevent blank screen if activeTab is unexpected */}
+          {activeTab !== "feed" &&
+            activeTab !== "create" &&
+            activeTab !== "messages" &&
+            activeTab !== "companion" &&
+            activeTab !== "profile" && (
+              <div className="rounded-xl border border-border bg-muted p-4 text-sm text-foreground">
+                Unknown tab: <span className="font-mono">{String(activeTab)}</span>
+              </div>
+            )}
         </div>
       </ScrollArea>
 

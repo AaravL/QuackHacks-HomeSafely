@@ -385,3 +385,26 @@ export async function getRecommendations(userLocation?: string, userDestination?
     return null
   }
 }
+
+export async function geminiChat(
+  message: string,
+  history?: { role: string; text: string }[],
+  mode: string = "walk-home-companion"
+) {
+  const url = `${API_BASE_URL}/gemini/chat`
+  console.log("[geminiChat] POST", url)
+
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...getAuthHeaders() },
+    body: JSON.stringify({ message, history, mode }),
+  })
+
+  if (!res.ok) {
+    const raw = await res.text().catch(() => "")
+    console.error("[geminiChat] Failed:", res.status, res.statusText, raw)
+    throw new Error(`Gemini failed (${res.status}): ${raw.slice(0, 200)}`)
+  }
+
+  return safeJson<{ reply: string }>(res)
+}

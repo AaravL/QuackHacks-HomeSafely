@@ -48,4 +48,4 @@ export interface Conversation {
   unreadCount: number
 }
 
-export type TabId = "feed" | "create" | "messages" | "profile"
+export type TabId = "feed" | "create" | "messages" | "profile" | "companion"
