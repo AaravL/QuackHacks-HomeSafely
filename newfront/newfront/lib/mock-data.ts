@@ -77,6 +77,8 @@ function futureDate(hoursFromNow: number): string {
   return d.toISOString()
 }
 
+// Trips are kept as fallback UI in case the backend is unavailable.
+// The store will replace these with real backend data on load.
 export const mockTrips: Trip[] = [
   {
     id: "trip-1",
@@ -146,102 +148,9 @@ export const mockTrips: Trip[] = [
   },
 ]
 
-export const mockConversations: Conversation[] = [
-  {
-    id: "conv-1",
-    participantIds: ["user-1", "user-2"],
-    lastMessage: "Sounds good, see you at the hospital entrance!",
-    lastMessageTime: new Date(Date.now() - 1000 * 60 * 15).toISOString(),
-    unreadCount: 1,
-  },
-  {
-    id: "conv-2",
-    participantIds: ["user-1", "user-5"],
-    lastMessage: "I'll be at the corner of Bleecker and MacDougal",
-    lastMessageTime: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(),
-    unreadCount: 0,
-  },
-  {
-    id: "conv-3",
-    participantIds: ["user-1", "user-3"],
-    lastMessage: "Want to take the L together tomorrow?",
-    lastMessageTime: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
-    unreadCount: 2,
-  },
-]
-
-export const mockMessages: Message[] = [
-  // conv-1 with Marcus
-  {
-    id: "msg-1",
-    conversationId: "conv-1",
-    senderId: "user-2",
-    text: "Hey! I saw your trip from Mount Sinai. I'm heading the same way tonight.",
-    timestamp: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
-  },
-  {
-    id: "msg-2",
-    conversationId: "conv-1",
-    senderId: "user-1",
-    text: "That's great! What time do you get off? I'll be done around 11pm.",
-    timestamp: new Date(Date.now() - 1000 * 60 * 25).toISOString(),
-  },
-  {
-    id: "msg-3",
-    conversationId: "conv-1",
-    senderId: "user-2",
-    text: "Perfect, my shift ends at 11 too. Meet at the main entrance?",
-    timestamp: new Date(Date.now() - 1000 * 60 * 20).toISOString(),
-  },
-  {
-    id: "msg-4",
-    conversationId: "conv-1",
-    senderId: "user-1",
-    text: "Sounds good, see you at the hospital entrance!",
-    timestamp: new Date(Date.now() - 1000 * 60 * 15).toISOString(),
-  },
-  // conv-2 with Sofia
-  {
-    id: "msg-5",
-    conversationId: "conv-2",
-    senderId: "user-5",
-    text: "Hey! Closing shift tonight. Want to walk to the subway together?",
-    timestamp: new Date(Date.now() - 1000 * 60 * 60 * 3).toISOString(),
-  },
-  {
-    id: "msg-6",
-    conversationId: "conv-2",
-    senderId: "user-1",
-    text: "Absolutely! Where should we meet?",
-    timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2.5).toISOString(),
-  },
-  {
-    id: "msg-7",
-    conversationId: "conv-2",
-    senderId: "user-5",
-    text: "I'll be at the corner of Bleecker and MacDougal",
-    timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(),
-  },
-  // conv-3 with Priya
-  {
-    id: "msg-8",
-    conversationId: "conv-3",
-    senderId: "user-3",
-    text: "I take the L from Williamsburg every morning. Do you?",
-    timestamp: new Date(Date.now() - 1000 * 60 * 60 * 25).toISOString(),
-  },
-  {
-    id: "msg-9",
-    conversationId: "conv-3",
-    senderId: "user-1",
-    text: "Sometimes! I'm more of a night commuter though.",
-    timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24.5).toISOString(),
-  },
-  {
-    id: "msg-10",
-    conversationId: "conv-3",
-    senderId: "user-3",
-    text: "Want to take the L together tomorrow?",
-    timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
-  },
-]
+// !! IMPORTANT !!
+// Conversations and messages must be empty — they come entirely from the backend.
+// Putting mock data here causes the store to poll /api/messages/conv-1 etc.
+// which are fake IDs that don't exist in Snowflake, causing constant 404s.
+export const mockConversations: Conversation[] = []
+export const mockMessages: Message[] = []

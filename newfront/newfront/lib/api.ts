@@ -2,6 +2,8 @@ import type { TransportMode } from './types'
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api'
 
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
 function getCurrentUserId(): string | null {
   if (typeof window === 'undefined') return null
   try {
@@ -17,292 +19,313 @@ function getCurrentUserId(): string | null {
 function getAuthHeaders(): Record<string, string> {
   if (typeof window === 'undefined') return {}
   const token = localStorage.getItem('authToken')
-  if (token) {
-    return { 'Authorization': `Bearer ${token}` }
-  }
-  return {}
+  return token ? { Authorization: `Bearer ${token}` } : {}
 }
 
-// Auth
+async function safeJson<T>(res: Response): Promise<T> {
+  const contentType = res.headers.get('content-type') || ''
+  if (!contentType.includes('application/json')) {
+    throw new Error('Server returned non-JSON response. Is the backend running?')
+  }
+  const data = await res.json()
+  if (!res.ok) throw new Error(data?.error || `Request failed: ${res.status}`)
+  return data as T
+}
+
+// ── Auth ──────────────────────────────────────────────────────────────────────
+
 export async function login(email: string, password: string) {
+  const res = await fetch(`${API_BASE_URL}/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password }),
+  })
+  const data = await safeJson<{ token: string; user: any }>(res)
+  if (data.token) localStorage.setItem('authToken', data.token)
+  if (data.user) localStorage.setItem('currentUser', JSON.stringify(data.user))
+  return data
+}
+
+export async function signup(payload: {
+  email: string
+  password: string
+  name?: string
+  age?: number
+  gender?: string
+  username?: string
+  university?: string
+}) {
+  const res = await fetch(`${API_BASE_URL}/auth/register`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+  // Register returns { message } — no token yet, user must log in after
+  return safeJson<{ message: string }>(res)
+}
+
+export function logout() {
+  localStorage.removeItem('authToken')
+  localStorage.removeItem('currentUser')
+}
+
+// ── Users ─────────────────────────────────────────────────────────────────────
+
+/** GET /api/users/:userId */
+export async function getUser(userId: string) {
   try {
-    const res = await fetch(`${API_BASE_URL}/auth/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password }),
+    const res = await fetch(`${API_BASE_URL}/users/${userId}`, {
+      headers: getAuthHeaders(),
     })
-    
-    const contentType = res.headers.get('content-type')
-    if (!contentType || !contentType.includes('application/json')) {
-      throw new Error('Server returned non-JSON response. Is the backend running?')
-    }
-    
-    if (!res.ok) {
-      const error = await res.json()
-      throw new Error(error.error || 'Login failed')
-    }
-    
-    const data = await res.json()
-    if (data.token) {
-      localStorage.setItem('authToken', data.token)
-    }
-    return data
-  } catch (err: any) {
-    console.error('Login error:', err)
-    throw err
+    if (!res.ok) return null
+    return res.json()
+  } catch {
+    return null
   }
 }
 
-export async function signup(data: any) {
+/** GET /api/users/me  — returns the currently authenticated user */
+export async function getMe() {
   try {
-    const res = await fetch(`${API_BASE_URL}/auth/register`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
+    const res = await fetch(`${API_BASE_URL}/users/me`, {
+      headers: getAuthHeaders(),
     })
-    
-    const contentType = res.headers.get('content-type')
-    if (!contentType || !contentType.includes('application/json')) {
-      throw new Error('Server returned non-JSON response. Is the backend running?')
-    }
-    
-    if (!res.ok) {
-      const error = await res.json()
-      throw new Error(error.error || 'Signup failed')
-    }
-    
-    const result = await res.json()
-    if (result.token) {
-      localStorage.setItem('authToken', result.token)
-    }
-    return result
-  } catch (err: any) {
-    console.error('Signup error:', err)
-    throw err
+    if (!res.ok) return null
+    return res.json()
+  } catch {
+    return null
   }
 }
 
-// Posts/Trips
+/** PUT /api/users/:userId */
+export async function updateProfile(updates: Record<string, any>) {
+  const userId = getCurrentUserId()
+  if (!userId) return null
+  try {
+    const res = await fetch(`${API_BASE_URL}/users/${userId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+      body: JSON.stringify(updates),
+    })
+    if (!res.ok) return null
+    return res.json()
+  } catch {
+    return null
+  }
+}
+
+/** PUT /api/users/:userId/status */
+export async function setOnlineStatus(isOnline: boolean) {
+  const userId = getCurrentUserId()
+  if (!userId) return null
+  try {
+    const res = await fetch(`${API_BASE_URL}/users/${userId}/status`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+      body: JSON.stringify({ isOnline }),
+    })
+    if (!res.ok) return null
+    return res.json()
+  } catch {
+    return null
+  }
+}
+
+// ── Posts / Trips ─────────────────────────────────────────────────────────────
+
+const backendToFrontendMode: Record<string, TransportMode> = {
+  uber: 'rideshare',
+  hybrid: 'transit',
+  walking: 'walking',
+}
+
+const frontendToBackendMode: Record<string, string> = {
+  rideshare: 'uber',
+  transit: 'hybrid',
+  walking: 'walking',
+}
+
+/** GET /api/posts */
 export async function getTrips(params?: {
   sortBy?: string
   userId?: string
   userLat?: number
   userLng?: number
 }) {
-  const searchParams = new URLSearchParams()
-  if (params?.sortBy) searchParams.append('sortBy', params.sortBy)
-  if (params?.userId) searchParams.append('userId', params.userId)
-  if (params?.userLat) searchParams.append('userLat', params.userLat.toString())
-  if (params?.userLng) searchParams.append('userLng', params.userLng.toString())
-
   try {
+    const searchParams = new URLSearchParams()
+    if (params?.sortBy) searchParams.append('sortBy', params.sortBy)
+    if (params?.userId) searchParams.append('userId', params.userId)
+    if (params?.userLat != null) searchParams.append('userLat', String(params.userLat))
+    if (params?.userLng != null) searchParams.append('userLng', String(params.userLng))
+
     const res = await fetch(`${API_BASE_URL}/posts?${searchParams}`, {
       headers: getAuthHeaders(),
     })
-    if (!res.ok) {
-      console.warn(`Failed to fetch trips: ${res.status}`)
-      return null
-    }
+    if (!res.ok) return null
     const data = await res.json()
-    
-    // Transform backend POSTS shape to frontend Trip shape
-    // Backend returns: USER_ID, START_LAT, START_LNG, END_LAT, END_LNG, DESTINATION, MODE, IS_ACTIVE, CREATED_AT, NAME, AGE, GENDER, PROFILE_IMAGE
-    // Frontend expects: id, userId, from, to, transportMode, departureTime, notes, createdAt, status
-    
-    if (!Array.isArray(data)) return data
-    
-    const modeMap: Record<string, TransportMode> = {
-      uber: 'rideshare',
-      hybrid: 'transit',
-      walking: 'walking',
-    }
-    
+    if (!Array.isArray(data)) return null
+
     return data.map((row: any) => ({
-      id: row.ID || `trip-${row.USER_ID}-${Date.now()}`,
+      id: String(row.ID),
       userId: String(row.USER_ID),
-      from: `${row.START_LAT}, ${row.START_LNG}`, // or use DESTINATION for "to"
-      to: row.DESTINATION || 'Unknown',
-      transportMode: modeMap[row.MODE?.toLowerCase()] || 'transit',
-      departureTime: row.CREATED_AT || new Date().toISOString(),
-      notes: row.NOTES || '',
-      createdAt: row.CREATED_AT || new Date().toISOString(),
+      from: `${row.START_LAT}, ${row.START_LNG}`,
+      to: row.DESTINATION ?? 'Unknown',
+      transportMode: backendToFrontendMode[row.MODE?.toLowerCase()] ?? 'transit',
+      departureTime: row.CREATED_AT ?? new Date().toISOString(),
+      notes: row.NOTES ?? '',
+      createdAt: row.CREATED_AT ?? new Date().toISOString(),
       status: row.IS_ACTIVE ? 'open' : 'completed',
+      // Extra user fields joined by backend
+      userName: row.NAME ?? '',
+      userAge: row.AGE ?? null,
+      userGender: row.GENDER ?? '',
+      userAvatar: row.PROFILE_IMAGE ?? '',
     }))
-  } catch (err) {
-    console.warn('Failed to fetch trips:', err)
+  } catch {
     return null
   }
 }
 
-export async function createTrip(data: any) {
+/** POST /api/posts */
+export async function createTrip(data: {
+  startLat?: number
+  startLng?: number
+  endLat?: number
+  endLng?: number
+  destination?: string
+  to?: string
+  mode?: string
+  from?: string
+}) {
   const userId = getCurrentUserId()
-  if (!userId) {
-    throw new Error('Not authenticated')
-  }
-
-  const modeMap: Record<string, string> = {
-    rideshare: 'uber',
-    walking: 'walking',
-    transit: 'hybrid',
-  }
+  if (!userId) throw new Error('Not authenticated')
 
   const payload = {
     userId,
     startLat: Number(data.startLat ?? 40.7128),
     startLng: Number(data.startLng ?? -74.006),
-    endLat: Number(data.endLat ?? 40.7138),
-    endLng: Number(data.endLng ?? -74.001),
+    endLat:   Number(data.endLat   ?? 40.7138),
+    endLng:   Number(data.endLng   ?? -74.001),
     destination: data.destination ?? data.to ?? '',
-    mode: modeMap[data.mode] ?? 'hybrid',
+    mode: frontendToBackendMode[data.mode ?? ''] ?? 'hybrid',
   }
 
   const res = await fetch(`${API_BASE_URL}/posts`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...getAuthHeaders(),
-    },
+    headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
     body: JSON.stringify(payload),
   })
-  if (!res.ok) {
-    const contentType = res.headers.get('content-type') || ''
-    if (contentType.includes('application/json')) {
-      const error = await res.json()
-      throw new Error(error.error || 'Failed to create trip')
-    }
-    const errorText = await res.text()
-    throw new Error(errorText || 'Failed to create trip')
-  }
-  return res.json()
+  return safeJson(res)
 }
 
+/** DELETE /api/posts/:postId  (soft-delete, sets IS_ACTIVE = FALSE) */
+export async function deleteTrip(postId: string) {
+  const res = await fetch(`${API_BASE_URL}/posts/${postId}`, {
+    method: 'DELETE',
+    headers: getAuthHeaders(),
+  })
+  return safeJson(res)
+}
+
+// joinTrip is handled via messaging — no separate /join endpoint on the backend
 export async function joinTrip(postId: string) {
-  try {
-    const res = await fetch(`${API_BASE_URL}/posts/${postId}/join`, {
-      method: 'POST',
-      headers: getAuthHeaders(),
-    })
-    if (!res.ok) {
-      const contentType = res.headers.get('content-type') || ''
-      if (contentType.includes('application/json')) {
-        const error = await res.json()
-        throw new Error(error.error || 'Failed to join trip')
-      }
-      const errorText = await res.text()
-      throw new Error(errorText || 'Failed to join trip')
-    }
-    return res.json()
-  } catch (err) {
-    console.warn('Failed to join trip:', err)
-    throw err
-  }
+  // Intentionally a no-op on the backend for now.
+  // The "join" flow creates a conversation + message instead.
+  return { ok: true, postId }
 }
 
-// Users
-export async function getUser(userId: string) {
-  try {
-    const res = await fetch(`${API_BASE_URL}/users/${userId}`, {
-      headers: getAuthHeaders(),
-    })
-    if (!res.ok) {
-      console.warn(`Failed to fetch user: ${res.status}`)
-      return null
-    }
-    return res.json()
-  } catch (err) {
-    console.warn('Failed to fetch user:', err)
-    return null
-  }
-}
+// ── Messages ──────────────────────────────────────────────────────────────────
 
-export async function updateProfile(data: any) {
-  try {
-    const res = await fetch(`${API_BASE_URL}/users/profile`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        ...getAuthHeaders(),
-      },
-      body: JSON.stringify(data),
-    })
-    if (!res.ok) {
-      console.warn(`Failed to update profile: ${res.status}`)
-      return null
-    }
-    return res.json()
-  } catch (err) {
-    console.warn('Failed to update profile:', err)
-    return null
-  }
-}
-
-// Messages
+/**
+ * GET /api/messages/conversations/:userId
+ * Returns all conversations for the current user.
+ */
 export async function getConversations() {
+  const userId = getCurrentUserId()
+  if (!userId) return null
   try {
-    const res = await fetch(`${API_BASE_URL}/messages/conversations`, {
+    const res = await fetch(`${API_BASE_URL}/messages/conversations/${userId}`, {
       headers: getAuthHeaders(),
     })
-    if (!res.ok) {
-      console.warn(`Failed to fetch conversations: ${res.status}`)
-      return null
-    }
+    if (!res.ok) return null
     return res.json()
-  } catch (err) {
-    console.warn('Failed to fetch conversations:', err)
+  } catch {
     return null
   }
 }
 
-export async function getMessages(conversationId: string) {
+/**
+ * GET /api/messages/chat/:userId/:otherUserId
+ * conversationId here is expected to be the OTHER user's id.
+ */
+export async function getMessages(otherUserId: string) {
+  const userId = getCurrentUserId()
+  if (!userId) return null
   try {
-    const res = await fetch(`${API_BASE_URL}/messages/${conversationId}`, {
+    const res = await fetch(`${API_BASE_URL}/messages/chat/${userId}/${otherUserId}`, {
       headers: getAuthHeaders(),
     })
-    if (!res.ok) {
-      console.warn(`Failed to fetch messages: ${res.status}`)
-      return null
-    }
+    if (!res.ok) return null
     return res.json()
-  } catch (err) {
-    console.warn('Failed to fetch messages:', err)
+  } catch {
     return null
   }
 }
 
-export async function sendMessage(conversationId: string, text: string) {
+/**
+ * POST /api/messages
+ * recipientId = the other user's ID (backend expects senderId + recipientId + content)
+ */
+export async function sendMessage(recipientId: string, text: string) {
+  const senderId = getCurrentUserId()
+  if (!senderId) return null
   try {
     const res = await fetch(`${API_BASE_URL}/messages`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...getAuthHeaders(),
-      },
-      body: JSON.stringify({ conversationId, text }),
+      headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+      body: JSON.stringify({ senderId, recipientId, content: text }),
     })
-    if (!res.ok) {
-      console.warn(`Failed to send message: ${res.status}`)
-      return null
-    }
+    if (!res.ok) return null
     return res.json()
-  } catch (err) {
-    console.warn('Failed to send message:', err)
+  } catch {
     return null
   }
 }
 
-// Recommendations
-export async function getRecommendations() {
+/**
+ * POST /api/messages/archive/:userId/:otherUserId
+ */
+export async function archiveConversation(otherUserId: string) {
+  const userId = getCurrentUserId()
+  if (!userId) return null
   try {
-    const res = await fetch(`${API_BASE_URL}/recommendations`, {
+    const res = await fetch(`${API_BASE_URL}/messages/archive/${userId}/${otherUserId}`, {
+      method: 'POST',
       headers: getAuthHeaders(),
     })
-    if (!res.ok) {
-      console.warn(`Failed to fetch recommendations: ${res.status}`)
-      return null
-    }
+    if (!res.ok) return null
     return res.json()
-  } catch (err) {
-    console.warn('Failed to fetch recommendations:', err)
+  } catch {
+    return null
+  }
+}
+
+// ── Recommendations ───────────────────────────────────────────────────────────
+
+/** POST /api/recommendations/personalized */
+export async function getRecommendations(userLocation?: string, userDestination?: string) {
+  const userId = getCurrentUserId()
+  if (!userId) return null
+  try {
+    const res = await fetch(`${API_BASE_URL}/recommendations/personalized`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+      body: JSON.stringify({ userId, userLocation, userDestination }),
+    })
+    if (!res.ok) return null
+    return res.json()
+  } catch {
     return null
   }
 }

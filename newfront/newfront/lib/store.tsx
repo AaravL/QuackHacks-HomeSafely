@@ -6,17 +6,15 @@ import {
   useState,
   useEffect,
   useCallback,
+  useRef,
   type ReactNode,
 } from "react"
 import type { User, Trip, Conversation, Message, TabId } from "./types"
-import {
-  mockUsers,
-  mockTrips,
-  mockConversations,
-  mockMessages,
-} from "./mock-data"
+import { mockUsers, mockTrips, mockConversations, mockMessages } from "./mock-data"
 import * as api from "./api"
 import { useAuth } from "./auth-context"
+
+// ── Types ─────────────────────────────────────────────────────────────────────
 
 interface AppState {
   currentUserId: string
@@ -34,31 +32,39 @@ interface AppStore extends AppState {
   currentUser: User
   getUserById: (id: string) => User | undefined
   addTrip: (trip: Trip) => void
-  sendMessage: (conversationId: string, text: string) => void
+  sendMessage: (recipientId: string, text: string) => void
   updateProfile: (updates: Partial<User>) => void
   requestToJoin: (tripId: string) => void
+  archiveConversation: (otherUserId: string) => void
 }
 
-const AppStoreContext = createContext<AppStore | null>(null)
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
 const STORAGE_KEY = "hitch-data"
 
 function normalizeGender(gender?: string): User["gender"] {
-  if (gender === "male" || gender === "female" || gender === "non-binary" || gender === "prefer-not-to-say") {
-    return gender
-  }
-  return "prefer-not-to-say"
+  const valid = ["male", "female", "non-binary", "prefer-not-to-say"]
+  return valid.includes(gender ?? "") ? (gender as User["gender"]) : "prefer-not-to-say"
 }
+
+
+const STORAGE_VERSION = 2  // ← bump this any time you want to wipe cached data
 
 function loadFromStorage(): Partial<AppState> | null {
   if (typeof window === "undefined") return null
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
-    if (raw) return JSON.parse(raw) as Partial<AppState>
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as Partial<AppState> & { version?: number }
+    // If version doesn't match, wipe the cache
+    if (parsed.version !== STORAGE_VERSION) {
+      localStorage.removeItem(STORAGE_KEY)
+      return null
+    }
+    return parsed
   } catch {
-    // ignore
+    return null
   }
-  return null
 }
 
 function saveToStorage(state: AppState) {
@@ -67,6 +73,7 @@ function saveToStorage(state: AppState) {
     localStorage.setItem(
       STORAGE_KEY,
       JSON.stringify({
+        version: STORAGE_VERSION,  // ← save version alongside data
         users: state.users,
         trips: state.trips,
         conversations: state.conversations,
@@ -78,22 +85,69 @@ function saveToStorage(state: AppState) {
   }
 }
 
+/**
+ * Maps a raw backend message row to the frontend Message shape.
+ * conversationId is always the OTHER user's ID so it stays consistent
+ * regardless of who sent the message.
+ */
+function mapBackendMessage(m: any, currentUserId: string): Message {
+  const otherUserId =
+    String(m.SENDER_ID) === currentUserId
+      ? String(m.RECIPIENT_ID)
+      : String(m.SENDER_ID)
+
+  return {
+    id: String(m.ID),
+    conversationId: otherUserId, // ← key by other user, not a local conv id
+    senderId: String(m.SENDER_ID),
+    text: m.CONTENT,
+    timestamp: m.CREATED_AT,
+  }
+}
+
+/**
+ * Maps a raw backend conversation row (from GET /messages/conversations/:userId)
+ * to the frontend Conversation shape.
+ */
+function mapBackendConversation(row: any, currentUserId: string): Conversation {
+  const otherId = String(row.OTHER_USER_ID)
+  return {
+    id: otherId, // ← keyed by other user's ID, matches conversationId in messages
+    participantIds: [currentUserId, otherId],
+    lastMessage: row.LAST_MESSAGE_CONTENT ?? "",
+    lastMessageTime: row.LAST_MESSAGE_TIME ?? new Date().toISOString(),
+    unreadCount: 0,
+  }
+}
+
+// ── Context ───────────────────────────────────────────────────────────────────
+
+const AppStoreContext = createContext<AppStore | null>(null)
+
 export function AppStoreProvider({ children }: { children: ReactNode }) {
   const { user: authUser } = useAuth()
+
   const [hydrated, setHydrated] = useState(false)
   const [users, setUsers] = useState<User[]>(mockUsers)
   const [trips, setTrips] = useState<Trip[]>(mockTrips)
-  const [conversations, setConversations] =
-    useState<Conversation[]>(mockConversations)
+  const [conversations, setConversations] = useState<Conversation[]>(mockConversations)
   const [messages, setMessages] = useState<Message[]>(mockMessages)
   const [activeTab, setActiveTab] = useState<TabId>("feed")
   const [activeChatId, setActiveChatId] = useState<string | null>(null)
-  const currentUserId = authUser?.id ? String(authUser.id) : mockUsers[0]?.id ?? ""
 
+  // Refs so polling intervals always see the latest values without re-registering
+  const activeChatIdRef = useRef(activeChatId)
+  const currentUserIdRef = useRef("")
+  useEffect(() => { activeChatIdRef.current = activeChatId }, [activeChatId])
+
+  const currentUserId = authUser?.id ? String(authUser.id) : mockUsers[0]?.id ?? ""
+  useEffect(() => { currentUserIdRef.current = currentUserId }, [currentUserId])
+
+  // ── Sync auth user into users list ──────────────────────────────────────────
   useEffect(() => {
     if (!authUser) return
 
-    const mappedAuthUser: User = {
+    const mappedUser: User = {
       id: String(authUser.id),
       name: authUser.name,
       age: authUser.age,
@@ -106,123 +160,115 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
     }
 
     setUsers((prev) => {
-      const existingIndex = prev.findIndex((u) => u.id === mappedAuthUser.id)
-      if (existingIndex === -1) {
-        return [mappedAuthUser, ...prev]
-      }
-
+      const idx = prev.findIndex((u) => u.id === mappedUser.id)
+      if (idx === -1) return [mappedUser, ...prev]
       const updated = [...prev]
-      updated[existingIndex] = { ...updated[existingIndex], ...mappedAuthUser }
+      updated[idx] = { ...updated[idx], ...mappedUser }
       return updated
     })
+
+    api.setOnlineStatus(true)
+    return () => { api.setOnlineStatus(false) }
   }, [authUser])
 
-<<<<<<< HEAD
-  // Hydrate from localStorage on mount
-  useEffect(() => {
+  // ── Initial hydration ────────────────────────────────────────────────────────
+useEffect(() => {
+  const load = async () => {
     const saved = loadFromStorage()
     if (saved) {
       if (saved.users) setUsers(saved.users)
       if (saved.trips) setTrips(saved.trips)
-      if (saved.conversations) setConversations(saved.conversations)
-      if (saved.messages) setMessages(saved.messages)
+      // ← DO NOT restore conversations or messages from localStorage
+      // They will be fetched fresh from the backend below
     }
+
+    const [fetchedTrips, fetchedConvs] = await Promise.allSettled([
+      api.getTrips({ sortBy: "recommendation" }),
+      api.getConversations(),
+    ])
+
+    if (fetchedTrips.status === "fulfilled" && Array.isArray(fetchedTrips.value)) {
+      setTrips(fetchedTrips.value as Trip[])
+    }
+    if (fetchedConvs.status === "fulfilled" && Array.isArray(fetchedConvs.value)) {
+      const uid = String(authUser?.id ?? "")
+      setConversations(
+        (fetchedConvs.value as any[]).map((r) => mapBackendConversation(r, uid))
+      )
+    }
+
     setHydrated(true)
-=======
-  // Hydrate from localStorage and fetch from backend on mount
+  }
+  load()
+}, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Poll trips every 10 s ────────────────────────────────────────────────────
   useEffect(() => {
-    const loadData = async () => {
-      const saved = loadFromStorage()
-      if (saved) {
-        if (saved.users) setUsers(saved.users)
-        if (saved.trips) setTrips(saved.trips)
-        if (saved.conversations) setConversations(saved.conversations)
-        if (saved.messages) setMessages(saved.messages)
-      }
-
-      // Fetch fresh data from backend
-      try {
-        const fetchedTrips = await api.getTrips()
-        if (fetchedTrips && Array.isArray(fetchedTrips)) {
-          setTrips(fetchedTrips)
-        } else if (fetchedTrips === null) {
-          console.info('Using mock trips (backend unavailable)')
-        }
-      } catch (error) {
-        console.error('Failed to fetch trips from backend:', error)
-        // Fall back to mock data already set
-      }
-
-      try {
-        const fetchedConversations = await api.getConversations()
-        if (fetchedConversations && Array.isArray(fetchedConversations)) {
-          setConversations(fetchedConversations)
-        } else if (fetchedConversations === null) {
-          console.info('Using mock conversations (backend unavailable)')
-        }
-      } catch (error) {
-        console.error('Failed to fetch conversations:', error)
-      }
-
-      setHydrated(true)
-    }
-
-    loadData()
+    const id = setInterval(async () => {
+      const fetched = await api.getTrips({ sortBy: "recommendation" })
+      if (Array.isArray(fetched)) setTrips(fetched as Trip[])
+    }, 10_000)
+    return () => clearInterval(id)
   }, [])
 
-  // Poll for new trips every 5 seconds to sync across browsers
+  // ── Poll active chat messages every 2 s ──────────────────────────────────────
+  // Uses refs so the interval never needs to be torn down just because
+  // activeChatId or currentUserId changed.
   useEffect(() => {
-    const pollTrips = async () => {
-      try {
-        const fetchedTrips = await api.getTrips()
-        if (fetchedTrips && Array.isArray(fetchedTrips)) {
-          setTrips(fetchedTrips)
-        }
-      } catch (error) {
-        // Silent fail on polling errors
-      }
-    }
+    const id = setInterval(async () => {
+      const otherUserId = activeChatIdRef.current
+      const myId = currentUserIdRef.current
+      if (!otherUserId || !myId) return
 
-    const interval = setInterval(pollTrips, 5000)
-    return () => clearInterval(interval)
+      const fetched = await api.getMessages(otherUserId)
+      if (!Array.isArray(fetched)) return
+
+      const mapped = (fetched as any[]).map((m) => mapBackendMessage(m, myId))
+
+      setMessages((prev) => {
+        // Remove old messages for this conversation, replace with fresh from backend
+        const others = prev.filter((m) => m.conversationId !== otherUserId)
+        return [...others, ...mapped]
+      })
+
+      // Also keep the conversation's lastMessage in sync
+      if (mapped.length > 0) {
+        const last = mapped[mapped.length - 1]
+        setConversations((prev) =>
+          prev.map((c) =>
+            c.id === otherUserId
+              ? { ...c, lastMessage: last.text, lastMessageTime: last.timestamp }
+              : c
+          )
+        )
+      }
+    }, 2_000)
+    return () => clearInterval(id)
+  }, []) // ← intentionally empty: refs keep it current
+
+  // ── Poll conversations list every 5 s to catch new chats ────────────────────
+  useEffect(() => {
+    const id = setInterval(async () => {
+      const myId = currentUserIdRef.current
+      if (!myId) return
+
+      const fetched = await api.getConversations()
+      if (!Array.isArray(fetched)) return
+
+      setConversations((prev) => {
+        const fromBackend = (fetched as any[]).map((r) =>
+          mapBackendConversation(r, myId)
+        )
+        // Merge: keep any local-only convs (optimistic), update the rest
+        const backendIds = new Set(fromBackend.map((c) => c.id))
+        const localOnly = prev.filter((c) => !backendIds.has(c.id))
+        return [...fromBackend, ...localOnly]
+      })
+    }, 5_000)
+    return () => clearInterval(id)
   }, [])
 
-  // Poll for new messages and conversations every 2 seconds for real-time chat
-  useEffect(() => {
-    if (!currentUserId) return
-
-    const pollMessages = async () => {
-      try {
-        const fetchedConversations = await api.getConversations()
-        if (fetchedConversations && Array.isArray(fetchedConversations)) {
-          setConversations(fetchedConversations)
-        }
-
-        // Also fetch messages for each conversation
-        for (const conv of conversations) {
-          try {
-            const fetchedMessages = await api.getMessages(conv.id)
-            if (fetchedMessages && Array.isArray(fetchedMessages)) {
-              setMessages((prev) => {
-                // Replace messages for this conversation, keep others
-                const otherMsgs = prev.filter((m) => m.conversationId !== conv.id)
-                return [...otherMsgs, ...fetchedMessages]
-              })
-            }
-          } catch {
-            // Silent fail per message
-          }
-        }
-      } catch (error) {
-        // Silent fail on polling errors
-      }
-    }
-
-    const interval = setInterval(pollMessages, 2000)
-    return () => clearInterval(interval)
-  }, [currentUserId, conversations])
-
-  // Persist to localStorage whenever data changes
+  // ── Persist to localStorage ──────────────────────────────────────────────────
   useEffect(() => {
     if (!hydrated) return
     saveToStorage({
@@ -236,131 +282,116 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
     })
   }, [hydrated, currentUserId, users, trips, conversations, messages, activeTab, activeChatId])
 
-  const currentUser =
-    users.find((u) => u.id === currentUserId) ?? mockUsers[0]
+  // ── Derived ──────────────────────────────────────────────────────────────────
+  const currentUser = users.find((u) => u.id === currentUserId) ?? mockUsers[0]
 
   const getUserById = useCallback(
     (id: string) => users.find((u) => u.id === id),
     [users]
   )
 
+  // ── Actions ──────────────────────────────────────────────────────────────────
+
   const addTrip = useCallback((trip: Trip) => {
-<<<<<<< HEAD
     setTrips((prev) => [trip, ...prev])
-=======
-    // Create trip via API
     api.createTrip({
-      from: trip.from,
+      destination: trip.to,
       to: trip.to,
+      from: trip.from,
       mode: trip.transportMode,
-    }).then(() => {
-      setTrips((prev) => [trip, ...prev])
-    }).catch(error => {
-      console.error('Failed to create trip:', error)
-      // Optimistically add to UI
-      setTrips((prev) => [trip, ...prev])
+    }).catch((err) => {
+      console.error("Failed to create trip:", err)
+      setTrips((prev) => prev.filter((t) => t.id !== trip.id))
     })
->>>>>>> 7e69480bbb574c28642c6bd106eab596600fb6a3
   }, [])
 
   const sendMessage = useCallback(
-    (conversationId: string, text: string) => {
+    (recipientId: string, text: string) => {
       const newMsg: Message = {
         id: `msg-${Date.now()}`,
-        conversationId,
+        conversationId: recipientId, // keyed by other user's ID
         senderId: currentUserId,
         text,
         timestamp: new Date().toISOString(),
       }
-<<<<<<< HEAD
-=======
-      
-      // Send via API
-      api.sendMessage(conversationId, text).catch(error => {
-        console.error('Failed to send message:', error)
-      })
-      
-      // Optimistically update UI
->>>>>>> 7e69480bbb574c28642c6bd106eab596600fb6a3
+
+      // Optimistic update — message shows immediately
       setMessages((prev) => [...prev, newMsg])
-      setConversations((prev) =>
-        prev.map((c) =>
-          c.id === conversationId
-            ? { ...c, lastMessage: text, lastMessageTime: newMsg.timestamp }
-            : c
-        )
-      )
+      setConversations((prev) => {
+        const exists = prev.find((c) => c.id === recipientId)
+        if (exists) {
+          return prev.map((c) =>
+            c.id === recipientId
+              ? { ...c, lastMessage: text, lastMessageTime: newMsg.timestamp }
+              : c
+          )
+        }
+        // Create conversation entry if it doesn't exist yet
+        return [
+          {
+            id: recipientId,
+            participantIds: [currentUserId, recipientId],
+            lastMessage: text,
+            lastMessageTime: newMsg.timestamp,
+            unreadCount: 0,
+          },
+          ...prev,
+        ]
+      })
+
+      api.sendMessage(recipientId, text).catch((err) => {
+        console.error("Failed to send message:", err)
+        // Roll back optimistic message on failure
+        setMessages((prev) => prev.filter((m) => m.id !== newMsg.id))
+      })
     },
     [currentUserId]
   )
 
-  const updateProfile = useCallback((updates: Partial<User>) => {
-<<<<<<< HEAD
-=======
-    // Update via API
-    api.updateProfile(updates).catch(error => {
-      console.error('Failed to update profile:', error)
-    })
-    
-    // Optimistically update UI
->>>>>>> 7e69480bbb574c28642c6bd106eab596600fb6a3
-    setUsers((prev) =>
-      prev.map((u) =>
-        u.id === currentUserId ? { ...u, ...updates } : u
+  const updateProfile = useCallback(
+    (updates: Partial<User>) => {
+      setUsers((prev) =>
+        prev.map((u) => (u.id === currentUserId ? { ...u, ...updates } : u))
       )
-    )
-  }, [currentUserId])
+      api.updateProfile(updates).catch((err) => {
+        console.error("Failed to update profile:", err)
+      })
+    },
+    [currentUserId]
+  )
 
   const requestToJoin = useCallback(
     (tripId: string) => {
       const trip = trips.find((t) => t.id === tripId)
       if (!trip) return
 
-      // Check if conversation already exists
       const existing = conversations.find(
         (c) =>
           c.participantIds.includes(currentUserId) &&
           c.participantIds.includes(trip.userId)
       )
-
       if (existing) {
         setActiveChatId(existing.id)
         setActiveTab("messages")
         return
       }
 
-<<<<<<< HEAD
-=======
-      // Join trip via API
-      api.joinTrip(tripId).catch(error => {
-        console.error('Failed to join trip:', error)
-      })
-
->>>>>>> 7e69480bbb574c28642c6bd106eab596600fb6a3
-      const newConv: Conversation = {
-        id: `conv-${Date.now()}`,
-        participantIds: [currentUserId, trip.userId],
-        lastMessage: "Hi! I'd like to join your trip.",
-        lastMessageTime: new Date().toISOString(),
-        unreadCount: 0,
-      }
-
-      const newMsg: Message = {
-        id: `msg-${Date.now()}`,
-        conversationId: newConv.id,
-        senderId: currentUserId,
-        text: "Hi! I'd like to join your trip.",
-        timestamp: new Date().toISOString(),
-      }
-
-      setConversations((prev) => [newConv, ...prev])
-      setMessages((prev) => [...prev, newMsg])
-      setActiveChatId(newConv.id)
+      setActiveChatId(trip.userId)
       setActiveTab("messages")
+      sendMessage(trip.userId, "Hi! I'd like to join your trip.")
     },
-    [trips, conversations, currentUserId]
+    [trips, conversations, currentUserId, sendMessage]
   )
 
+  const archiveConversation = useCallback((otherUserId: string) => {
+    setConversations((prev) => prev.filter((c) => c.id !== otherUserId))
+    setMessages((prev) => prev.filter((m) => m.conversationId !== otherUserId))
+    api.archiveConversation(otherUserId).catch((err) => {
+      console.error("Failed to archive conversation:", err)
+    })
+  }, [])
+
+  // ── Store value ───────────────────────────────────────────────────────────────
   const store: AppStore = {
     currentUserId,
     users,
@@ -377,11 +408,10 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
     sendMessage,
     updateProfile,
     requestToJoin,
+    archiveConversation,
   }
 
-  if (!hydrated) {
-    return null
-  }
+  if (!hydrated) return null
 
   return (
     <AppStoreContext.Provider value={store}>{children}</AppStoreContext.Provider>
