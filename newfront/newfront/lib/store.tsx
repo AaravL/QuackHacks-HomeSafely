@@ -390,6 +390,10 @@ useEffect(() => {
       to: trip.to,
       from: trip.from,
       mode: trip.transportMode,
+      visibleToGender: trip.visibleToGender,
+      visibleToAgeMin: trip.visibleToAgeMin,
+      visibleToAgeMax: trip.visibleToAgeMax,
+      visibleToUniversity: trip.visibleToUniversity,
     }).catch((err) => {
       console.error("Failed to create trip:", err)
       setTrips((prev) => prev.filter((t) => t.id !== trip.id))

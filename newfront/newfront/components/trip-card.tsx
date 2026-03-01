@@ -46,6 +46,29 @@ export function TripCard({ trip, user, onRequestJoin, isOwn }: TripCardProps) {
   // Show time in EST
   const estTimeStr = formatInTimeZone(departureDate, 'America/New_York', 'MMM d, h:mm a zzz')
 
+  const visibilityParts: string[] = []
+  if (trip.visibleToGender) {
+    visibilityParts.push(`Gender: ${trip.visibleToGender}`)
+  }
+  if (trip.visibleToAgeMin != null || trip.visibleToAgeMax != null) {
+    if (trip.visibleToAgeMin != null && trip.visibleToAgeMax != null) {
+      visibilityParts.push(`Age: ${trip.visibleToAgeMin}-${trip.visibleToAgeMax}`)
+    } else if (trip.visibleToAgeMin != null) {
+      visibilityParts.push(`Age: ${trip.visibleToAgeMin}+`)
+    } else if (trip.visibleToAgeMax != null) {
+      visibilityParts.push(`Age: up to ${trip.visibleToAgeMax}`)
+    }
+  }
+  if (trip.visibleToUniversity) {
+    visibilityParts.push(
+      trip.visibleToUniversity === "same"
+        ? "University: same as you"
+        : `University: ${trip.visibleToUniversity}`
+    )
+  }
+  const visibilityLabel =
+    visibilityParts.length > 0 ? visibilityParts.join(" • ") : "Visible to everyone"
+
   const initials = user.name
     .split(" ")
     .map((n) => n[0])
@@ -112,6 +135,12 @@ export function TripCard({ trip, user, onRequestJoin, isOwn }: TripCardProps) {
           <p className="text-xs leading-relaxed text-muted-foreground">
             {trip.notes}
           </p>
+        )}
+
+        {isOwn && (
+          <div className="rounded-lg border border-border/70 bg-secondary/40 px-3 py-2 text-xs text-muted-foreground">
+            <span className="font-medium text-foreground">Visibility:</span> {visibilityLabel}
+          </div>
         )}
 
         {/* Footer: time + action */}

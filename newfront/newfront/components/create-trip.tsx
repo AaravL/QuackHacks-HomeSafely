@@ -12,6 +12,7 @@ import {
   Sparkles,
   Loader2,
   StickyNote,
+  SlidersHorizontal,
 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -52,6 +53,10 @@ export function CreateTrip() {
   const [notes, setNotes] = useState("")
   const [safetyTips, setSafetyTips] = useState<SafetyTip[]>([])
   const [loadingTips, setLoadingTips] = useState(false)
+  const [visibleToGender, setVisibleToGender] = useState<string>("all")
+  const [visibleToAgeMin, setVisibleToAgeMin] = useState<string>("")
+  const [visibleToAgeMax, setVisibleToAgeMax] = useState<string>("")
+  const [visibleToUniversity, setVisibleToUniversity] = useState<string>("all")
 
   async function fetchSafetyTips() {
     if (!from || !to) {
@@ -85,6 +90,19 @@ export function CreateTrip() {
       return
     }
 
+    const minAge = visibleToAgeMin ? parseInt(visibleToAgeMin, 10) : null
+    const maxAge = visibleToAgeMax ? parseInt(visibleToAgeMax, 10) : null
+    if (
+      minAge !== null &&
+      maxAge !== null &&
+      !Number.isNaN(minAge) &&
+      !Number.isNaN(maxAge) &&
+      minAge > maxAge
+    ) {
+      toast.error("Minimum age cannot be greater than maximum age")
+      return
+    }
+
     const departureTime = new Date(`${date}T${time}`).toISOString()
 
     addTrip({
@@ -97,6 +115,10 @@ export function CreateTrip() {
       notes,
       createdAt: new Date().toISOString(),
       status: "open",
+      visibleToGender: visibleToGender === "all" ? null : visibleToGender,
+      visibleToAgeMin: minAge,
+      visibleToAgeMax: maxAge,
+      visibleToUniversity: visibleToUniversity === "all" ? null : visibleToUniversity,
     }, {
       startLat: fromLat,
       startLng: fromLng,
@@ -112,6 +134,10 @@ export function CreateTrip() {
     setTime("")
     setNotes("")
     setSafetyTips([])
+    setVisibleToGender("all")
+    setVisibleToAgeMin("")
+    setVisibleToAgeMax("")
+    setVisibleToUniversity("all")
     setActiveTab("feed")
   }
 
@@ -215,6 +241,83 @@ export function CreateTrip() {
             </div>
           </div>
         </div>
+
+        {/* Visibility Filters */}
+        <Card className="border-border/60 bg-card">
+          <CardContent className="flex flex-col gap-3 p-4">
+            <div className="flex items-center gap-2">
+              <SlidersHorizontal className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm font-semibold text-foreground">
+                Who Can See This Trip
+              </span>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Control who can see and join your trip
+            </p>
+
+            {/* Gender Filter */}
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="visibleGender" className="text-xs font-medium text-muted-foreground">
+                Gender
+              </Label>
+              <select
+                id="visibleGender"
+                value={visibleToGender}
+                onChange={(e) => setVisibleToGender(e.target.value)}
+                className="h-10 rounded-md border border-border bg-secondary px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+              >
+                <option value="all">All Genders</option>
+                <option value="male">Male Only</option>
+                <option value="female">Female Only</option>
+                <option value="non-binary">Non-Binary Only</option>
+              </select>
+            </div>
+
+            {/* Age Range Filter */}
+            <div className="flex flex-col gap-1.5">
+              <Label className="text-xs font-medium text-muted-foreground">
+                Age Range (optional)
+              </Label>
+              <div className="grid grid-cols-2 gap-2">
+                <Input
+                  type="number"
+                  placeholder="Min age"
+                  value={visibleToAgeMin}
+                  onChange={(e) => setVisibleToAgeMin(e.target.value)}
+                  className="h-10 border-border bg-secondary text-sm text-foreground"
+                  min="18"
+                  max="100"
+                />
+                <Input
+                  type="number"
+                  placeholder="Max age"
+                  value={visibleToAgeMax}
+                  onChange={(e) => setVisibleToAgeMax(e.target.value)}
+                  className="h-10 border-border bg-secondary text-sm text-foreground"
+                  min="18"
+                  max="100"
+                />
+              </div>
+            </div>
+
+            {/* University Filter */}
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="visibleUniversity" className="text-xs font-medium text-muted-foreground">
+                University
+              </Label>
+              <select
+                id="visibleUniversity"
+                value={visibleToUniversity}
+                onChange={(e) => setVisibleToUniversity(e.target.value)}
+                className="h-10 rounded-md border border-border bg-secondary px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+              >
+                <option value="all">All Universities</option>
+                <option value="Stevens Institute of Technology">Stevens Institute of Technology</option>
+                <option value="same">Same University Only</option>
+              </select>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Notes */}
         <div className="flex flex-col gap-1.5">
