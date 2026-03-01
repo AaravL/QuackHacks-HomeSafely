@@ -2,7 +2,7 @@
 const express = require("express");
 const router = express.Router();
 
-const { GoogleGenAI } = require("@google/genai");
+const { GoogleGenerativeAI } = require("@google/generative-ai");
 require("dotenv").config();
 
 const apiKey = process.env.GEMINI_API_KEY;
@@ -10,7 +10,7 @@ if (!apiKey) {
   throw new Error("Missing GEMINI_API_KEY in environment");
 }
 
-const client = new GoogleGenAI({ apiKey });
+const client = new GoogleGenerativeAI(apiKey);
 
 function extractGeminiText(result) {
   if (result?.response?.text) {
