@@ -25,6 +25,10 @@ export interface Trip {
   createdAt: string
   status: "open" | "matched" | "completed"
   tripDistance?: number | null // Distance in miles
+  visibleToGender?: string | null
+  visibleToAgeMin?: number | null
+  visibleToAgeMax?: number | null
+  visibleToUniversity?: string | null
 }
 
 export interface Message {

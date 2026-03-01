@@ -9,6 +9,7 @@ import { MessagesList } from "@/components/messages-list"
 import { ChatView } from "@/components/chat-view"
 import { UserProfile } from "@/components/user-profile"
 import { AuthPage } from "@/components/auth-page"
+import GeminiCallTab from "@/components/gemini-call" // ✅ ADD THIS
 import { useAppStore } from "@/lib/store"
 import { useAuth } from "@/lib/auth-context"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -51,21 +52,22 @@ export default function HomePage() {
 
   return (
     <main className="relative mx-auto flex min-h-dvh max-w-md flex-col bg-background">
-      {/* Scrollable content area */}
       <ScrollArea className="flex-1">
         <div className="flex flex-col gap-2 px-4 pb-24 pt-4">
-          {/* Show app header except in chat view */}
+
+          {/* Hide header in chat view only */}
           {!(activeTab === "messages" && activeChatId) && <AppHeader />}
 
           {activeTab === "feed" && <TripFeed />}
           {activeTab === "create" && <CreateTrip />}
           {activeTab === "messages" && !activeChatId && <MessagesList />}
           {activeTab === "messages" && activeChatId && <ChatView />}
+          {activeTab === "companion" && <GeminiCallTab />} {/* ✅ ADD THIS */}
           {activeTab === "profile" && <UserProfile />}
+
         </div>
       </ScrollArea>
 
-      {/* Fixed bottom nav */}
       <BottomNav />
     </main>
   )

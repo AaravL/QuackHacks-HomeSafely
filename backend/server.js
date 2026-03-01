@@ -51,6 +51,17 @@ app.use("/api/posts", authMiddleware, require("./routes/posts"));
 app.use("/api/messages", authMiddleware, require("./routes/messages"));
 app.use("/api/recommendations", authMiddleware, require("./routes/recommendations"));
 
+
+// ── Gemini AI route ───────────────────────────────────────────────────────────
+const geminiRoutes = require("./routes/gemini");
+console.log("geminiRoutes typeof:", typeof geminiRoutes, geminiRoutes);
+app.use("/api/gemini", authMiddleware, require("./routes/gemini")); // (or public if you want)
+
+
+
+// --- 404 + error ---
+app.use((req, res) => res.status(404).json({ error: "Route not found" }));
+app.use(errorHandler);
 // ── WebSocket – real-time messaging ──────────────────────────────────────────
 const connectedUsers = new Map();
 

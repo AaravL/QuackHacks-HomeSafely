@@ -1,6 +1,6 @@
 "use client"
 
-import { Compass, PlusCircle, MessageCircle, UserRound } from "lucide-react"
+import { Compass, PlusCircle, MessageCircle, UserRound, PhoneCall } from "lucide-react"
 import type { TabId } from "@/lib/types"
 import { useAppStore } from "@/lib/store"
 import { cn } from "@/lib/utils"
@@ -9,6 +9,7 @@ const tabs: { id: TabId; label: string; icon: typeof Compass }[] = [
   { id: "feed", label: "Explore", icon: Compass },
   { id: "create", label: "New Trip", icon: PlusCircle },
   { id: "messages", label: "Messages", icon: MessageCircle },
+  { id: "companion", label: "Companion", icon: PhoneCall },
   { id: "profile", label: "Profile", icon: UserRound },
 ]
 
