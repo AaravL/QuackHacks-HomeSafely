@@ -19,16 +19,30 @@ function getCurrentUserId(): string | null {
 function getAuthHeaders(): Record<string, string> {
   if (typeof window === 'undefined') return {}
   const token = localStorage.getItem('authToken')
+  if (!token) {
+    console.warn('[getAuthHeaders] No authToken found in localStorage')
+  } else {
+    console.log('[getAuthHeaders] Token found:', token.substring(0, 20) + '...')
+  }
   return token ? { Authorization: `Bearer ${token}` } : {}
 }
 
 async function safeJson<T>(res: Response): Promise<T> {
   const contentType = res.headers.get('content-type') || ''
   if (!contentType.includes('application/json')) {
-    throw new Error('Server returned non-JSON response. Is the backend running?')
+    const text = await res.text()
+    console.error('[safeJson] Non-JSON response:', { status: res.status, text: text.slice(0, 500) })
+    throw new Error(`Server returned non-JSON response (${res.status}): ${text.slice(0, 200)}`)
   }
   const data = await res.json()
-  if (!res.ok) throw new Error(data?.error || `Request failed: ${res.status}`)
+  if (!res.ok) {
+    console.error('[safeJson] Request failed:', { 
+      status: res.status, 
+      statusText: res.statusText, 
+      data 
+    })
+    throw new Error(data?.error || data?.message || `Request failed: ${res.status}`)
+  }
   return data as T
 }
 
@@ -211,12 +225,21 @@ export async function createTrip(data: {
     mode: frontendToBackendMode[data.mode ?? ''] ?? 'hybrid',
   }
 
-  const res = await fetch(`${API_BASE_URL}/posts`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
-    body: JSON.stringify(payload),
-  })
-  return safeJson(res)
+  console.log('[createTrip] Posting to backend:', payload)
+
+  try {
+    const res = await fetch(`${API_BASE_URL}/posts`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+      body: JSON.stringify(payload),
+    })
+    const result = await safeJson(res)
+    console.log('[createTrip] Success:', result)
+    return result
+  } catch (error) {
+    console.error('[createTrip] Failed:', error)
+    throw error
+  }
 }
 
 /** DELETE /api/posts/:postId  (soft-delete, sets IS_ACTIVE = FALSE) */

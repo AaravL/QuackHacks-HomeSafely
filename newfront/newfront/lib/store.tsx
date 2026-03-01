@@ -138,10 +138,28 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
   // Refs so polling intervals always see the latest values without re-registering
   const activeChatIdRef = useRef(activeChatId)
   const currentUserIdRef = useRef("")
+  const previousMessageIdsRef = useRef<Set<string>>(new Set())
+  
   useEffect(() => { activeChatIdRef.current = activeChatId }, [activeChatId])
 
   const currentUserId = authUser?.id ? String(authUser.id) : mockUsers[0]?.id ?? ""
   useEffect(() => { currentUserIdRef.current = currentUserId }, [currentUserId])
+
+  // Request notification permission on mount
+  useEffect(() => {
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      if (Notification.permission === 'default') {
+        Notification.requestPermission()
+      }
+    }
+  }, [])
+
+  // Initialize previousMessageIdsRef with existing messages to avoid notifying on old messages
+  useEffect(() => {
+    if (hydrated && messages.length > 0 && previousMessageIdsRef.current.size === 0) {
+      messages.forEach((msg) => previousMessageIdsRef.current.add(msg.id))
+    }
+  }, [hydrated, messages])
 
   // ── Sync auth user into users list ──────────────────────────────────────────
   useEffect(() => {
@@ -220,31 +238,58 @@ useEffect(() => {
       const myId = currentUserIdRef.current
       if (!otherUserId || !myId) return
 
-      const fetched = await api.getMessages(otherUserId)
-      if (!Array.isArray(fetched)) return
+      try {
+        const fetched = await api.getMessages(otherUserId)
+        if (!Array.isArray(fetched)) return
 
-      const mapped = (fetched as any[]).map((m) => mapBackendMessage(m, myId))
+        const mapped = (fetched as any[]).map((m) => mapBackendMessage(m, myId))
 
-      setMessages((prev) => {
-        // Remove old messages for this conversation, replace with fresh from backend
-        const others = prev.filter((m) => m.conversationId !== otherUserId)
-        return [...others, ...mapped]
-      })
-
-      // Also keep the conversation's lastMessage in sync
-      if (mapped.length > 0) {
-        const last = mapped[mapped.length - 1]
-        setConversations((prev) =>
-          prev.map((c) =>
-            c.id === otherUserId
-              ? { ...c, lastMessage: last.text, lastMessageTime: last.timestamp }
-              : c
+        setMessages((prev) => {
+          // Detect new messages from others (not sent by me)
+          const newMessages = mapped.filter(
+            (msg) => 
+              !previousMessageIdsRef.current.has(msg.id) && 
+              msg.senderId !== myId
           )
-        )
+
+          // Show notifications for new messages
+          if (newMessages.length > 0 && typeof window !== 'undefined' && 'Notification' in window) {
+            if (Notification.permission === 'granted') {
+              console.log('[Store] Showing', newMessages.length, 'notifications')
+              newMessages.forEach((msg) => {
+                new Notification('New message', {
+                  body: msg.text.length > 100 ? msg.text.substring(0, 97) + '...' : msg.text,
+                  tag: msg.conversationId,
+                })
+              })
+            }
+          }
+
+          // Update the set of seen message IDs
+          mapped.forEach((msg) => previousMessageIdsRef.current.add(msg.id))
+
+          // Remove old messages for this conversation, replace with fresh from backend
+          const others = prev.filter((m) => m.conversationId !== otherUserId)
+          return [...others, ...mapped]
+        })
+
+        // Also keep the conversation's lastMessage in sync
+        if (mapped.length > 0) {
+          const last = mapped[mapped.length - 1]
+          setConversations((prev) =>
+            prev.map((c) =>
+              c.id === otherUserId
+                ? { ...c, lastMessage: last.text, lastMessageTime: last.timestamp }
+                : c
+            )
+          )
+        }
+      } catch (error) {
+        console.error('[Store] Message poll error:', error)
       }
     }, 2_000)
     return () => clearInterval(id)
-  }, []) // ← intentionally empty: refs keep it current
+  }, []) // ← no dependencies - refs keep it current
 
   // ── Poll conversations list every 5 s to catch new chats ────────────────────
   useEffect(() => {
