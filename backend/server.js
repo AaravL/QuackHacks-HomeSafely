@@ -43,9 +43,6 @@ app.use('/api/users', authMiddleware, require('./routes/users'));
 app.use('/api/messages', authMiddleware, require('./routes/messages'));
 app.use('/api/recommendations', authMiddleware, require('./routes/recommendations'));
 
-// WebSocket for real-time messaging
-const connectedUsers = new Map(); // Store active connections
-
 
 // ── Gemini AI route ───────────────────────────────────────────────────────────
 const geminiRoutes = require("./routes/gemini");
