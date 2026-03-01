@@ -40,13 +40,16 @@ router.get("/me", async (req, res) => {
 
     const results = await executeQuery(
       `SELECT ID, EMAIL, NAME, ACCOUNT, USERNAME, AGE, GENDER, UNIVERSITY,
-              IS_ONLINE, LAST_SEEN, CREATED_AT
+              IS_ONLINE, LAST_SEEN, TRIPS_COMPLETED, CREATED_AT
        FROM USERS WHERE ID = ? LIMIT 1`,
       [userId]
     );
 
     if (!results.length) return res.status(404).json({ error: "User not found" });
-    res.json(results[0]);
+    res.json({
+      ...results[0],
+      tripsCompleted: results[0].TRIPS_COMPLETED || 0
+    });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: "Failed to fetch user" });
@@ -87,7 +90,7 @@ router.get("/:userId", async (req, res) => {
 
     const query = `
       SELECT ID, NAME, ACCOUNT, USERNAME, AGE, GENDER, UNIVERSITY,
-             IS_ONLINE, LAST_SEEN, CREATED_AT
+             IS_ONLINE, LAST_SEEN, TRIPS_COMPLETED, CREATED_AT
       FROM USERS
       WHERE ID = ?
       LIMIT 1
@@ -99,19 +102,9 @@ router.get("/:userId", async (req, res) => {
       return res.status(404).json({ error: "User not found" });
     }
 
-    // Count active trips for this user
-    const tripCountQuery = `
-      SELECT COUNT(*) as TRIP_COUNT
-      FROM POSTS
-      WHERE USER_ID = ? AND IS_ACTIVE = true
-    `;
-    
-    const tripResults = await executeQuery(tripCountQuery, [userId]);
-    const tripCount = tripResults?.[0]?.TRIP_COUNT || 0;
-
     res.json({
       ...results[0],
-      tripsCompleted: tripCount,
+      tripsCompleted: results[0].TRIPS_COMPLETED || 0,
     });
   } catch (error) {
     console.error(error);

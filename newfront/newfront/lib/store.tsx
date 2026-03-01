@@ -225,9 +225,10 @@ useEffect(() => {
       // They will be fetched fresh from the backend below
     }
 
-    const [fetchedTrips, fetchedConvs] = await Promise.allSettled([
+    const [fetchedTrips, fetchedConvs, fetchedMe] = await Promise.allSettled([
       api.getTrips({ sortBy: "recommendation" }),
       api.getConversations(),
+      api.getMe(),
     ])
 
     if (fetchedTrips.status === "fulfilled" && Array.isArray(fetchedTrips.value)) {
@@ -240,6 +241,18 @@ useEffect(() => {
       )
     }
 
+    // Load current user's profile data including trips completed
+    if (fetchedMe.status === "fulfilled" && fetchedMe.value) {
+      const mappedUser = mapApiUserToStore(fetchedMe.value)
+      if (mappedUser) {
+        setUsers((prev) => {
+          const userMap = new Map(prev.map(u => [u.id, u]))
+          userMap.set(mappedUser.id, mappedUser)
+          return Array.from(userMap.values())
+        })
+      }
+    }
+
     setHydrated(true)
   }
   load()
@@ -249,7 +262,11 @@ useEffect(() => {
   useEffect(() => {
     const id = setInterval(async () => {
       try {
-        const fetched = await api.getTrips({ sortBy: "recommendation" })
+        const [fetched, meData] = await Promise.all([
+          api.getTrips({ sortBy: "recommendation" }),
+          api.getMe(),
+        ])
+        
         console.log('[Store] getTrips returned:', fetched?.length || 0, 'trips', fetched)
         if (Array.isArray(fetched)) {
           console.log('[Store] Setting trips from API:', fetched)
@@ -277,6 +294,18 @@ useEffect(() => {
             })
             return Array.from(userMap.values())
           })
+        }
+
+        // Also update current user's profile to get latest trips completed count
+        if (meData) {
+          const mappedUser = mapApiUserToStore(meData)
+          if (mappedUser) {
+            setUsers((prev) => {
+              const userMap = new Map(prev.map(u => [u.id, u]))
+              userMap.set(mappedUser.id, mappedUser)
+              return Array.from(userMap.values())
+            })
+          }
         }
       } catch (error) {
         console.error('[Store] Error fetching trips:', error)

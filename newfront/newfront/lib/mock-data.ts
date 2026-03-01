@@ -9,7 +9,7 @@ export const mockUsers: User[] = [
     age: 26,
     gender: "female",
     avatar: "",
-    bio: "Grad student at NYU. Usually heading home late after study sessions. Safety first!",
+    bio: "Grad student at Columbia. Usually heading home late after study sessions. Safety first!",
     verified: true,
     tripsCompleted: 14,
     rating: 4.9,

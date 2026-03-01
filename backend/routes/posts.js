@@ -280,6 +280,85 @@ router.post('/', async (req, res) => {
   }
 });
 
+// PUT /api/posts/:postId/complete
+router.put('/:postId/complete', async (req, res) => {
+  try {
+    const { postId } = req.params;
+    const { companionEmail } = req.body;
+
+    console.log('[posts complete] Received request - postId:', postId, 'companionEmail:', companionEmail);
+
+    if (!companionEmail) {
+      return res.status(400).json({ error: 'Companion email is required' });
+    }
+
+    // First, get the user_id from the post
+    let postQuery = `SELECT USER_ID FROM POSTS WHERE ID = ?`;
+    let postResults = await executeQuery(postQuery, [postId]);
+    
+    if (!postResults || postResults.length === 0) {
+      return res.status(404).json({ error: 'Trip not found' });
+    }
+    
+    const userId = postResults[0].USER_ID;
+    console.log('[posts complete] Found userId:', userId);
+
+    // Get companion user by email
+    let companionQuery = `SELECT ID FROM USERS WHERE EMAIL = ?`;
+    let companionResults = await executeQuery(companionQuery, [companionEmail]);
+    const companionId = companionResults?.[0]?.ID;
+    
+    if (companionId) {
+      console.log('[posts complete] Found companion userId:', companionId);
+    } else {
+      console.log('[posts complete] Companion email not found in database:', companionEmail);
+    }
+
+    // Mark the trip as completed
+    await executeQuery(
+      `UPDATE POSTS 
+       SET IS_ACTIVE = FALSE,
+           UPDATED_AT = CURRENT_TIMESTAMP()
+       WHERE ID = ?`,
+      [postId]
+    );
+    console.log('[posts complete] Marked trip as inactive');
+
+    // Increment trip owner's trips completed
+    try {
+      await executeQuery(
+        `UPDATE USERS
+         SET TRIPS_COMPLETED = TRIPS_COMPLETED + 1
+         WHERE ID = ?`,
+        [userId]
+      );
+      console.log('[posts complete] Incremented trip owner trips count');
+    } catch (err) {
+      console.log('[posts complete] TRIPS_COMPLETED column may not exist on owner, continuing:', err.message);
+    }
+
+    // Increment companion's trips completed if found
+    if (companionId) {
+      try {
+        await executeQuery(
+          `UPDATE USERS
+           SET TRIPS_COMPLETED = TRIPS_COMPLETED + 1
+           WHERE ID = ?`,
+          [companionId]
+        );
+        console.log('[posts complete] Incremented companion trips count');
+      } catch (err) {
+        console.log('[posts complete] TRIPS_COMPLETED column may not exist on companion, continuing:', err.message);
+      }
+    }
+
+    res.json({ message: 'Trip marked as completed', companionId });
+  } catch (error) {
+    console.error('[posts complete] Error completing trip:', error);
+    res.status(500).json({ error: 'Failed to complete trip', details: error.message });
+  }
+});
+
 // DELETE /api/posts/:postId  (soft delete)
 router.delete('/:postId', async (req, res) => {
   try {
