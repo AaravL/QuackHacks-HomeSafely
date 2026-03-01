@@ -4,7 +4,8 @@
 
 > Built for QuackHacks 2025 - Empowering safer travel through community-driven companionship.
 - Health and Wellness Track submission
-- Best use of snowflake Bonus Track
+- Best use of snowflake Bonus Track submission
+- Best use of gemini Bonus Track submission
 
 ---
 
@@ -64,6 +65,7 @@ The platform emphasizes **verified community connections** (university email ver
 ### 🤖 AI-Powered Safety
 - **Gemini AI integration** provides personalized safety tips based on route, time, and mode of transport
 - Context-aware recommendations for different travel scenarios
+- **Gemini AI Companion** Acts as an AI companion, currently only works for messages, but future releases will allow for text to speech and allow for fake phone calls to allow users to act is if they are on the phone for uncomfortable situations
 
 ### 🌍 Location Intelligence
 - **Google Maps API integration** for accurate address autocomplete
