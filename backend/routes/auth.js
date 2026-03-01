@@ -6,9 +6,12 @@ const { executeQuery } = require("../services/snowflake");
 
 const router = express.Router();
 
-// Optional: enforce Stevens email
-function isAllowedEmail(email) {
-  return typeof email === "string" && email.toLowerCase().endsWith("@stevens.edu");
+function getUniversityFromStudentEmail(email) {
+  if (typeof email !== "string") return null;
+  const normalized = email.trim().toLowerCase();
+  if (normalized.endsWith("@stevens.edu")) return "Stevens Institute of Technology";
+  if (normalized.endsWith("@cornell.edu")) return "Cornell University";
+  return null;
 }
 
 /**
@@ -17,14 +20,22 @@ function isAllowedEmail(email) {
  */
 router.post("/register", async (req, res) => {
   try {
-    const { email, password, name, age, gender, account, username, university } = req.body || {};
+    const { email, password, name, age, gender, account, username } = req.body || {};
 
     if (!email || !password) {
       return res.status(400).json({ error: "email and password required" });
     }
 
-    // Uncomment if you want Stevens-only
-    // if (!isAllowedEmail(email)) return res.status(403).json({ error: "Stevens email required" });
+    const normalizedEmail = String(email).trim().toLowerCase();
+    const isStudentSignup = !account || String(account).toLowerCase() === "student";
+    const derivedUniversity = getUniversityFromStudentEmail(normalizedEmail);
+
+    if (isStudentSignup && !derivedUniversity) {
+      return res.status(403).json({
+        error:
+          "the app is currently requiring a stevens or cornell email for students to sign up",
+      });
+    }
 
     if (!process.env.JWT_SECRET) {
       return res.status(500).json({ error: "JWT_SECRET not set" });
@@ -33,7 +44,7 @@ router.post("/register", async (req, res) => {
     // Check existing
     const existing = await executeQuery(
       `SELECT ID FROM USERS WHERE EMAIL = ? LIMIT 1`,
-      [email]
+      [normalizedEmail]
     );
     if (existing.length) return res.status(409).json({ error: "Email already registered" });
 
@@ -46,14 +57,14 @@ router.post("/register", async (req, res) => {
       `INSERT INTO USERS (EMAIL, PASSWORD_HASH, NAME, ACCOUNT, USERNAME, AGE, GENDER, UNIVERSITY, CREATED_AT, UPDATED_AT)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP(), CURRENT_TIMESTAMP())`,
       [
-        email,
+        normalizedEmail,
         passwordHash,
         name ?? null,
         account ?? null,
         username ?? null,
         age ?? null,
         gender ?? null,
-        university ?? null,
+        derivedUniversity ?? null,
       ]
     );
 
@@ -72,6 +83,7 @@ router.post("/login", async (req, res) => {
   try {
     const { email, password } = req.body || {};
     if (!email || !password) return res.status(400).json({ error: "email and password required" });
+    const normalizedEmail = String(email).trim().toLowerCase();
 
     if (!process.env.JWT_SECRET) {
       return res.status(500).json({ error: "JWT_SECRET not set" });
@@ -82,7 +94,7 @@ router.post("/login", async (req, res) => {
        FROM USERS
        WHERE EMAIL = ?
        LIMIT 1`,
-      [email]
+      [normalizedEmail]
     );
 
     if (!rows.length) return res.status(401).json({ error: "Invalid credentials" });
