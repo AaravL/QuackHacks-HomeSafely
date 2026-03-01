@@ -1,8 +1,8 @@
 import type { Metadata, Viewport } from 'next'
 import { Inter, Space_Mono } from 'next/font/google'
-import { Analytics } from '@vercel/analytics/next'
 import { Toaster } from 'sonner'
 import { AppStoreProvider } from '@/lib/store'
+import { AuthProvider } from '@/lib/auth-context'
 import './globals.css'
 
 const inter = Inter({
@@ -17,7 +17,7 @@ const spaceMono = Space_Mono({
 })
 
 export const metadata: Metadata = {
-  title: 'HomeSafely - Find Safe Travel Companions',
+  title: 'Hitch - Find Safe Travel Companions',
   description: 'Never walk home alone. Find verified travel companions for your late-night commute.',
   generator: 'v0.app',
   icons: {
@@ -55,20 +55,21 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${inter.variable} ${spaceMono.variable}`}>
       <body className="font-sans antialiased">
-        <AppStoreProvider>
-          {children}
-          <Toaster
-            position="top-center"
-            toastOptions={{
-              style: {
-                background: 'oklch(0.22 0.012 250)',
-                border: '1px solid oklch(0.26 0.015 250)',
-                color: 'oklch(0.95 0.005 250)',
-              },
-            }}
-          />
-        </AppStoreProvider>
-        <Analytics />
+        <AuthProvider>
+          <AppStoreProvider>
+            {children}
+            <Toaster
+              position="top-center"
+              toastOptions={{
+                style: {
+                  background: 'oklch(0.22 0.012 250)',
+                  border: '1px solid oklch(0.26 0.015 250)',
+                  color: 'oklch(0.95 0.005 250)',
+                },
+              }}
+            />
+          </AppStoreProvider>
+        </AuthProvider>
       </body>
     </html>
   )

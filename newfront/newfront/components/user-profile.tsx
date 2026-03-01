@@ -25,10 +25,12 @@ import {
   DrawerClose,
 } from "@/components/ui/drawer"
 import { useAppStore } from "@/lib/store"
+import { useAuth } from "@/lib/auth-context"
 import { toast } from "sonner"
 
 export function UserProfile() {
   const { currentUser, updateProfile } = useAppStore()
+  const { logout } = useAuth()
   const [editName, setEditName] = useState(currentUser.name)
   const [editBio, setEditBio] = useState(currentUser.bio)
   const [editAge, setEditAge] = useState(String(currentUser.age))
@@ -49,10 +51,7 @@ export function UserProfile() {
   }
 
   function handleLogout() {
-    if (typeof window !== "undefined") {
-      localStorage.removeItem("homesafely-data")
-      window.location.reload()
-    }
+    logout()
   }
 
   return (

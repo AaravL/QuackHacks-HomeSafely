@@ -14,12 +14,15 @@ import {
   mockTrips,
   mockConversations,
   mockMessages,
-  CURRENT_USER_ID,
 } from "./mock-data"
 <<<<<<< HEAD
 =======
 import * as api from "./api"
+<<<<<<< HEAD
 >>>>>>> 7e69480bbb574c28642c6bd106eab596600fb6a3
+=======
+import { useAuth } from "./auth-context"
+>>>>>>> main
 
 interface AppState {
   currentUserId: string
@@ -44,7 +47,14 @@ interface AppStore extends AppState {
 
 const AppStoreContext = createContext<AppStore | null>(null)
 
-const STORAGE_KEY = "homesafely-data"
+const STORAGE_KEY = "hitch-data"
+
+function normalizeGender(gender?: string): User["gender"] {
+  if (gender === "male" || gender === "female" || gender === "non-binary" || gender === "prefer-not-to-say") {
+    return gender
+  }
+  return "prefer-not-to-say"
+}
 
 function loadFromStorage(): Partial<AppState> | null {
   if (typeof window === "undefined") return null
@@ -75,6 +85,7 @@ function saveToStorage(state: AppState) {
 }
 
 export function AppStoreProvider({ children }: { children: ReactNode }) {
+  const { user: authUser } = useAuth()
   const [hydrated, setHydrated] = useState(false)
   const [users, setUsers] = useState<User[]>(mockUsers)
   const [trips, setTrips] = useState<Trip[]>(mockTrips)
@@ -83,6 +94,34 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
   const [messages, setMessages] = useState<Message[]>(mockMessages)
   const [activeTab, setActiveTab] = useState<TabId>("feed")
   const [activeChatId, setActiveChatId] = useState<string | null>(null)
+  const currentUserId = authUser?.id ? String(authUser.id) : mockUsers[0]?.id ?? ""
+
+  useEffect(() => {
+    if (!authUser) return
+
+    const mappedAuthUser: User = {
+      id: String(authUser.id),
+      name: authUser.name,
+      age: authUser.age,
+      gender: normalizeGender(authUser.gender),
+      avatar: "",
+      bio: "",
+      verified: true,
+      tripsCompleted: 0,
+      rating: 5,
+    }
+
+    setUsers((prev) => {
+      const existingIndex = prev.findIndex((u) => u.id === mappedAuthUser.id)
+      if (existingIndex === -1) {
+        return [mappedAuthUser, ...prev]
+      }
+
+      const updated = [...prev]
+      updated[existingIndex] = { ...updated[existingIndex], ...mappedAuthUser }
+      return updated
+    })
+  }, [authUser])
 
 <<<<<<< HEAD
   // Hydrate from localStorage on mount
@@ -112,6 +151,8 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
         const fetchedTrips = await api.getTrips()
         if (fetchedTrips && Array.isArray(fetchedTrips)) {
           setTrips(fetchedTrips)
+        } else if (fetchedTrips === null) {
+          console.info('Using mock trips (backend unavailable)')
         }
       } catch (error) {
         console.error('Failed to fetch trips from backend:', error)
@@ -122,6 +163,8 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
         const fetchedConversations = await api.getConversations()
         if (fetchedConversations && Array.isArray(fetchedConversations)) {
           setConversations(fetchedConversations)
+        } else if (fetchedConversations === null) {
+          console.info('Using mock conversations (backend unavailable)')
         }
       } catch (error) {
         console.error('Failed to fetch conversations:', error)
@@ -134,11 +177,63 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
 >>>>>>> 7e69480bbb574c28642c6bd106eab596600fb6a3
   }, [])
 
+  // Poll for new trips every 5 seconds to sync across browsers
+  useEffect(() => {
+    const pollTrips = async () => {
+      try {
+        const fetchedTrips = await api.getTrips()
+        if (fetchedTrips && Array.isArray(fetchedTrips)) {
+          setTrips(fetchedTrips)
+        }
+      } catch (error) {
+        // Silent fail on polling errors
+      }
+    }
+
+    const interval = setInterval(pollTrips, 5000)
+    return () => clearInterval(interval)
+  }, [])
+
+  // Poll for new messages and conversations every 2 seconds for real-time chat
+  useEffect(() => {
+    if (!currentUserId) return
+
+    const pollMessages = async () => {
+      try {
+        const fetchedConversations = await api.getConversations()
+        if (fetchedConversations && Array.isArray(fetchedConversations)) {
+          setConversations(fetchedConversations)
+        }
+
+        // Also fetch messages for each conversation
+        for (const conv of conversations) {
+          try {
+            const fetchedMessages = await api.getMessages(conv.id)
+            if (fetchedMessages && Array.isArray(fetchedMessages)) {
+              setMessages((prev) => {
+                // Replace messages for this conversation, keep others
+                const otherMsgs = prev.filter((m) => m.conversationId !== conv.id)
+                return [...otherMsgs, ...fetchedMessages]
+              })
+            }
+          } catch {
+            // Silent fail per message
+          }
+        }
+      } catch (error) {
+        // Silent fail on polling errors
+      }
+    }
+
+    const interval = setInterval(pollMessages, 2000)
+    return () => clearInterval(interval)
+  }, [currentUserId, conversations])
+
   // Persist to localStorage whenever data changes
   useEffect(() => {
     if (!hydrated) return
     saveToStorage({
-      currentUserId: CURRENT_USER_ID,
+      currentUserId,
       users,
       trips,
       conversations,
@@ -146,10 +241,10 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       activeTab,
       activeChatId,
     })
-  }, [hydrated, users, trips, conversations, messages, activeTab, activeChatId])
+  }, [hydrated, currentUserId, users, trips, conversations, messages, activeTab, activeChatId])
 
   const currentUser =
-    users.find((u) => u.id === CURRENT_USER_ID) ?? mockUsers[0]
+    users.find((u) => u.id === currentUserId) ?? mockUsers[0]
 
   const getUserById = useCallback(
     (id: string) => users.find((u) => u.id === id),
@@ -162,13 +257,11 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
 =======
     // Create trip via API
     api.createTrip({
-      startLocation: trip.startLocation,
-      endLocation: trip.endLocation,
-      departureTime: trip.departureTime,
-      description: trip.description,
-      preferences: trip.preferences,
-    }).then(createdTrip => {
-      setTrips((prev) => [createdTrip, ...prev])
+      from: trip.from,
+      to: trip.to,
+      mode: trip.transportMode,
+    }).then(() => {
+      setTrips((prev) => [trip, ...prev])
     }).catch(error => {
       console.error('Failed to create trip:', error)
       // Optimistically add to UI
@@ -182,7 +275,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       const newMsg: Message = {
         id: `msg-${Date.now()}`,
         conversationId,
-        senderId: CURRENT_USER_ID,
+        senderId: currentUserId,
         text,
         timestamp: new Date().toISOString(),
       }
@@ -205,7 +298,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
         )
       )
     },
-    []
+    [currentUserId]
   )
 
   const updateProfile = useCallback((updates: Partial<User>) => {
@@ -220,10 +313,10 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
 >>>>>>> 7e69480bbb574c28642c6bd106eab596600fb6a3
     setUsers((prev) =>
       prev.map((u) =>
-        u.id === CURRENT_USER_ID ? { ...u, ...updates } : u
+        u.id === currentUserId ? { ...u, ...updates } : u
       )
     )
-  }, [])
+  }, [currentUserId])
 
   const requestToJoin = useCallback(
     (tripId: string) => {
@@ -233,7 +326,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       // Check if conversation already exists
       const existing = conversations.find(
         (c) =>
-          c.participantIds.includes(CURRENT_USER_ID) &&
+          c.participantIds.includes(currentUserId) &&
           c.participantIds.includes(trip.userId)
       )
 
@@ -253,7 +346,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
 >>>>>>> 7e69480bbb574c28642c6bd106eab596600fb6a3
       const newConv: Conversation = {
         id: `conv-${Date.now()}`,
-        participantIds: [CURRENT_USER_ID, trip.userId],
+        participantIds: [currentUserId, trip.userId],
         lastMessage: "Hi! I'd like to join your trip.",
         lastMessageTime: new Date().toISOString(),
         unreadCount: 0,
@@ -262,7 +355,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       const newMsg: Message = {
         id: `msg-${Date.now()}`,
         conversationId: newConv.id,
-        senderId: CURRENT_USER_ID,
+        senderId: currentUserId,
         text: "Hi! I'd like to join your trip.",
         timestamp: new Date().toISOString(),
       }
@@ -272,11 +365,11 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       setActiveChatId(newConv.id)
       setActiveTab("messages")
     },
-    [trips, conversations]
+    [trips, conversations, currentUserId]
   )
 
   const store: AppStore = {
-    currentUserId: CURRENT_USER_ID,
+    currentUserId,
     users,
     trips,
     conversations,

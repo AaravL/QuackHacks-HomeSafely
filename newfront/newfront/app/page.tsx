@@ -1,5 +1,6 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import { Shield } from "lucide-react"
 import { BottomNav } from "@/components/bottom-nav"
 import { TripFeed } from "@/components/trip-feed"
@@ -7,7 +8,9 @@ import { CreateTrip } from "@/components/create-trip"
 import { MessagesList } from "@/components/messages-list"
 import { ChatView } from "@/components/chat-view"
 import { UserProfile } from "@/components/user-profile"
+import { AuthPage } from "@/components/auth-page"
 import { useAppStore } from "@/lib/store"
+import { useAuth } from "@/lib/auth-context"
 import { ScrollArea } from "@/components/ui/scroll-area"
 
 function AppHeader() {
@@ -17,7 +20,7 @@ function AppHeader() {
         <Shield className="h-4.5 w-4.5 text-primary" />
       </div>
       <span className="font-mono text-sm font-bold tracking-tight text-foreground">
-        HomeSafely
+        Hitch
       </span>
     </header>
   )
@@ -25,6 +28,26 @@ function AppHeader() {
 
 export default function HomePage() {
   const { activeTab, activeChatId } = useAppStore()
+  const { isAuthenticated, isLoading, login } = useAuth()
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  if (!mounted || isLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <div className="animate-spin">
+          <Shield className="h-8 w-8 text-primary" />
+        </div>
+      </div>
+    )
+  }
+
+  if (!isAuthenticated) {
+    return <AuthPage onLoginSuccess={login} />
+  }
 
   return (
     <main className="relative mx-auto flex min-h-dvh max-w-md flex-col bg-background">

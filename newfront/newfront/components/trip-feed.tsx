@@ -6,7 +6,6 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { TripCard } from "@/components/trip-card"
 import { useAppStore } from "@/lib/store"
-import { CURRENT_USER_ID } from "@/lib/mock-data"
 import type { TransportMode } from "@/lib/types"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
@@ -19,7 +18,7 @@ const filters: { id: TransportMode | "all"; label: string }[] = [
 ]
 
 export function TripFeed() {
-  const { trips, getUserById, requestToJoin } = useAppStore()
+  const { trips, getUserById, requestToJoin, currentUserId } = useAppStore()
   const [search, setSearch] = useState("")
   const [activeFilter, setActiveFilter] = useState<TransportMode | "all">("all")
 
@@ -116,7 +115,7 @@ export function TripFeed() {
             trip={trip}
             user={getUserById(trip.userId)}
             onRequestJoin={handleJoin}
-            isOwn={trip.userId === CURRENT_USER_ID}
+            isOwn={trip.userId === currentUserId}
           />
         ))}
       </div>
