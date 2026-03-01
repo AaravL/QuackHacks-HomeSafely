@@ -14,7 +14,7 @@
 - **Demo Video** (2-3 minutes): [Add YouTube/Vimeo link here]
 - **Pitch Slides**: [Add Google Slides/PDF link here]
 
-*We recommend watching the demo video to see HomeSafely in action, especially to understand the real-time features and user experience flow.*
+*We recommend watching the demo video to see Hitch in action, especially to understand the real-time features and user experience flow.*
 
 ---
 
@@ -32,7 +32,7 @@ Walking alone late at night, commuting through unfamiliar areas, or traveling du
 
 ## 💡 Our Solution
 
-HomeSafely is a **community-driven companion-finding platform** that connects people traveling similar routes at similar times. Users post their trips (walking, transit, or rideshare) with departure times and locations, and the platform intelligently matches them with compatible companions based on:
+Hitch is a **community-driven companion-finding platform** that connects people traveling similar routes at similar times. Users post their trips (walking, transit, or rideshare) with departure times and locations, and the platform intelligently matches them with compatible companions based on:
 
 - **Proximity**: Haversine distance calculation of route length
 - **Timing**: Departure time alignment
@@ -229,8 +229,8 @@ Run the schema SQL in your Snowflake console:
 
 ```sql
 -- From backend/schema.sql
-CREATE DATABASE IF NOT EXISTS HOMESAFELY;
-USE DATABASE HOMESAFELY;
+CREATE DATABASE IF NOT EXISTS HITCH;
+USE DATABASE HITCH;
 USE SCHEMA PUBLIC;
 
 -- Then run the CREATE TABLE statements...
@@ -248,7 +248,7 @@ ALTER TABLE USERS ADD COLUMN TRIPS_COMPLETED INTEGER DEFAULT 0;
 ## 📂 Project Structure
 
 ```
-HomeSafely/
+HITCH/
 ├── backend/                 # Express.js API server
 │   ├── routes/             # API endpoints (auth, posts, users, messages)
 │   ├── services/           # Snowflake & Gemini integrations
