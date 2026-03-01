@@ -196,9 +196,9 @@ export async function getTrips(params?: {
       from: row.START_LOCATION || `${row.START_LAT}, ${row.START_LNG}`,
       to: row.DESTINATION ?? 'Unknown',
       transportMode: backendToFrontendMode[row.MODE?.toLowerCase()] ?? 'transit',
-      departureTime: row.CREATED_AT ?? new Date().toISOString(),
+      departureTime: row.CREATED_AT_UTC ?? row.CREATED_AT ?? new Date().toISOString(),
       notes: row.NOTES ?? '',
-      createdAt: row.CREATED_AT ?? new Date().toISOString(),
+      createdAt: row.CREATED_AT_UTC ?? row.CREATED_AT ?? new Date().toISOString(),
       status: row.IS_ACTIVE ? 'open' : 'completed',
       tripDistance: row.TRIP_DISTANCE ? Math.round(row.TRIP_DISTANCE * 10) / 10 : null,
       // Extra user fields joined by backend

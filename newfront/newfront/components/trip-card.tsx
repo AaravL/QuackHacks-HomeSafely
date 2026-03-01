@@ -1,6 +1,7 @@
 "use client"
 
 import { formatDistanceToNow } from "date-fns"
+import { formatInTimeZone } from "date-fns-tz"
 import {
   MapPin,
   ArrowRight,
@@ -41,6 +42,9 @@ export function TripCard({ trip, user, onRequestJoin, isOwn }: TripCardProps) {
   const timeLabel = isUpcoming
     ? `in ${formatDistanceToNow(departureDate)}`
     : `${formatDistanceToNow(departureDate)} ago`
+  
+  // Show time in EST
+  const estTimeStr = formatInTimeZone(departureDate, 'America/New_York', 'MMM d, h:mm a zzz')
 
   const initials = user.name
     .split(" ")
@@ -112,9 +116,12 @@ export function TripCard({ trip, user, onRequestJoin, isOwn }: TripCardProps) {
 
         {/* Footer: time + action */}
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <Clock className="h-3 w-3" />
-            <span>{timeLabel}</span>
+          <div className="flex flex-col gap-0.5 text-xs text-muted-foreground">
+            <div className="flex items-center gap-1.5">
+              <Clock className="h-3 w-3" />
+              <span>{timeLabel}</span>
+            </div>
+            <span className="text-xs text-muted-foreground/70">{estTimeStr}</span>
           </div>
           {!isOwn && (
             <Button

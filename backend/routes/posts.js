@@ -29,6 +29,7 @@ router.get('/', async (req, res) => {
     let query = `
       SELECT
         p.*,
+        TO_VARCHAR(CONVERT_TIMEZONE('UTC', p.CREATED_AT), 'YYYY-MM-DD"T"HH24:MI:SS.FF3"Z"') AS CREATED_AT_UTC,
         u.NAME,
         u.AGE,
         u.GENDER,

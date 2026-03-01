@@ -14,7 +14,8 @@ router.get('/chat/:userId/:otherUserId', async (req, res) => {
         RECIPIENT_ID,
         CONTENT,
         IS_ARCHIVED,
-        CREATED_AT
+        CREATED_AT,
+        TO_VARCHAR(CONVERT_TIMEZONE('UTC', CREATED_AT), 'YYYY-MM-DD"T"HH24:MI:SS.FF3"Z"') AS CREATED_AT_UTC
       FROM MESSAGES
       WHERE (SENDER_ID = ? AND RECIPIENT_ID = ?)
          OR (SENDER_ID = ? AND RECIPIENT_ID = ?)
@@ -44,6 +45,7 @@ router.get('/conversations/:userId', async (req, res) => {
           ELSE SENDER_ID
         END AS OTHER_USER_ID,
         MAX(CREATED_AT) AS LAST_MESSAGE_TIME,
+        TO_VARCHAR(CONVERT_TIMEZONE('UTC', MAX(CREATED_AT)), 'YYYY-MM-DD"T"HH24:MI:SS.FF3"Z"') AS LAST_MESSAGE_TIME_UTC,
         MAX(CONTENT)    AS LAST_MESSAGE_CONTENT
       FROM MESSAGES
       WHERE (SENDER_ID = ? OR RECIPIENT_ID = ?)
