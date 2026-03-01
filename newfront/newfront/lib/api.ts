@@ -209,6 +209,7 @@ export async function getTrips(params?: {
       userName: row.NAME ?? '',
       userAge: row.AGE ?? null,
       userGender: row.GENDER ?? '',
+      userUniversity: row.UNIVERSITY ?? '',
       userAvatar: row.PROFILE_IMAGE ?? '',
     }))
     console.log('[api.getTrips] Mapped to', mapped.length, 'trips:', mapped)

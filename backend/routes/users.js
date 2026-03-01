@@ -86,7 +86,7 @@ router.get("/:userId", async (req, res) => {
     const { userId } = req.params;
 
     const query = `
-      SELECT ID, ACCOUNT, USERNAME, AGE, GENDER, UNIVERSITY,
+      SELECT ID, NAME, ACCOUNT, USERNAME, AGE, GENDER, UNIVERSITY,
              IS_ONLINE, LAST_SEEN, CREATED_AT
       FROM USERS
       WHERE ID = ?
@@ -99,7 +99,20 @@ router.get("/:userId", async (req, res) => {
       return res.status(404).json({ error: "User not found" });
     }
 
-    res.json(results[0]);
+    // Count active trips for this user
+    const tripCountQuery = `
+      SELECT COUNT(*) as TRIP_COUNT
+      FROM POSTS
+      WHERE USER_ID = ? AND IS_ACTIVE = true
+    `;
+    
+    const tripResults = await executeQuery(tripCountQuery, [userId]);
+    const tripCount = tripResults?.[0]?.TRIP_COUNT || 0;
+
+    res.json({
+      ...results[0],
+      tripsCompleted: tripCount,
+    });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: "Failed to fetch user" });

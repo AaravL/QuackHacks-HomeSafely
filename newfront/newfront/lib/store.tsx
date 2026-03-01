@@ -52,6 +52,25 @@ function normalizeGender(gender?: string): User["gender"] {
   return valid.includes(gender ?? "") ? (gender as User["gender"]) : "prefer-not-to-say"
 }
 
+function mapApiUserToStore(raw: any): User | null {
+  if (!raw) return null
+  const id = raw.ID ?? raw.id
+  if (!id) return null
+
+  return {
+    id: String(id),
+    name: raw.NAME ?? raw.name ?? raw.USERNAME ?? raw.username ?? "Unknown User",
+    age: Number(raw.AGE ?? raw.age ?? 0),
+    gender: normalizeGender(raw.GENDER ?? raw.gender),
+    university: raw.UNIVERSITY ?? raw.university ?? "",
+    avatar: raw.PROFILE_IMAGE ?? raw.avatar ?? "",
+    bio: raw.BIO ?? raw.bio ?? "",
+    verified: true,
+    tripsCompleted: Number(raw.TRIPS_COMPLETED ?? raw.tripsCompleted ?? 0),
+    rating: Number(raw.RATING ?? raw.rating ?? 5),
+  }
+}
+
 
 const STORAGE_VERSION = 2  // ← bump this any time you want to wipe cached data
 
@@ -175,6 +194,7 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
       name: authUser.name,
       age: authUser.age,
       gender: normalizeGender(authUser.gender),
+      university: (authUser as any).university ?? "",
       avatar: "",
       bio: "",
       verified: true,
@@ -239,8 +259,9 @@ useEffect(() => {
           const tripUsers = fetched.map((trip: any) => ({
             id: trip.userId,
             name: trip.userName || 'Unknown User',
-            age: trip.userAge || null,
+            age: trip.userAge || 0,
             gender: normalizeGender(trip.userGender),
+            university: trip.userUniversity || '',
             avatar: trip.userAvatar || '',
             bio: '',
             verified: true,
@@ -251,9 +272,8 @@ useEffect(() => {
           setUsers((prev) => {
             const userMap = new Map(prev.map(u => [u.id, u]))
             tripUsers.forEach(u => {
-              if (!userMap.has(u.id)) {
-                userMap.set(u.id, u)
-              }
+              const existing = userMap.get(u.id)
+              userMap.set(u.id, existing ? { ...existing, ...u } : u)
             })
             return Array.from(userMap.values())
           })
@@ -348,6 +368,47 @@ useEffect(() => {
     }, 5_000)
     return () => clearInterval(id)
   }, [])
+
+  // ── Fetch missing user profiles for conversations ───────────────────────────
+  useEffect(() => {
+    const myId = currentUserId
+    if (!myId || conversations.length === 0) return
+
+    const knownIds = new Set(users.map((u) => u.id))
+    const missingIds = conversations
+      .map((c) => c.participantIds.find((id) => id !== myId))
+      .filter((id): id is string => Boolean(id && !knownIds.has(id)))
+
+    if (missingIds.length === 0) return
+
+    let cancelled = false
+    ;(async () => {
+      const uniqueMissing = Array.from(new Set(missingIds))
+      const fetchedUsers = await Promise.all(
+        uniqueMissing.map((id) => api.getUser(id))
+      )
+      if (cancelled) return
+
+      const mapped = fetchedUsers
+        .map((raw) => mapApiUserToStore(raw))
+        .filter((user): user is User => Boolean(user))
+
+      if (mapped.length === 0) return
+
+      setUsers((prev) => {
+        const userMap = new Map(prev.map((u) => [u.id, u]))
+        mapped.forEach((u) => {
+          const existing = userMap.get(u.id)
+          userMap.set(u.id, existing ? { ...existing, ...u } : u)
+        })
+        return Array.from(userMap.values())
+      })
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [conversations, users, currentUserId])
 
   // ── Persist to localStorage ──────────────────────────────────────────────────
   useEffect(() => {

@@ -3,7 +3,6 @@
 import { useState } from "react"
 import {
   ShieldCheck,
-  Star,
   MapPin,
   Pencil,
   LogOut,
@@ -157,7 +156,7 @@ export function UserProfile() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 gap-3">
+      <div className="flex justify-center">
         <div className="flex flex-col items-center gap-1 rounded-xl bg-secondary/50 p-4">
           <div className="flex items-center gap-1">
             <MapPin className="h-4 w-4 text-primary" />
@@ -166,15 +165,6 @@ export function UserProfile() {
             </span>
           </div>
           <span className="text-xs text-muted-foreground">Trips Completed</span>
-        </div>
-        <div className="flex flex-col items-center gap-1 rounded-xl bg-secondary/50 p-4">
-          <div className="flex items-center gap-1">
-            <Star className="h-4 w-4 text-accent" />
-            <span className="text-2xl font-bold text-foreground">
-              {currentUser.rating}
-            </span>
-          </div>
-          <span className="text-xs text-muted-foreground">Rating</span>
         </div>
       </div>
 

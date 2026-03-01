@@ -313,6 +313,7 @@ export function CreateTrip() {
               >
                 <option value="all">All Universities</option>
                 <option value="Stevens Institute of Technology">Stevens Institute of Technology</option>
+                <option value="Cornell University">Cornell University</option>
                 <option value="same">Same University Only</option>
               </select>
             </div>

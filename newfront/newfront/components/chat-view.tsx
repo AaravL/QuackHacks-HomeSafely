@@ -7,6 +7,13 @@ import { ArrowLeft, Send, ShieldCheck } from "lucide-react"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import {
+  Drawer,
+  DrawerContent,
+  DrawerHeader,
+  DrawerTitle,
+  DrawerTrigger,
+} from "@/components/ui/drawer"
 import { useAppStore } from "@/lib/store"
 import { cn } from "@/lib/utils"
 
@@ -68,24 +75,54 @@ export function ChatView() {
         >
           <ArrowLeft className="h-5 w-5" />
         </Button>
-        <Avatar className="h-9 w-9 border border-border">
-          <AvatarFallback className="bg-secondary text-xs font-semibold text-secondary-foreground">
-            {initials}
-          </AvatarFallback>
-        </Avatar>
-        <div className="flex flex-col">
-          <div className="flex items-center gap-1.5">
-            <span className="text-sm font-semibold text-foreground">
-              {other.name}
-            </span>
-            {other.verified && (
-              <ShieldCheck className="h-3.5 w-3.5 text-primary" />
-            )}
-          </div>
-          <span className="text-[10px] text-muted-foreground">
-            {other.tripsCompleted} trips completed
-          </span>
-        </div>
+        <Drawer>
+          <DrawerTrigger asChild>
+            <button className="flex items-center gap-3 rounded-md text-left transition-colors hover:bg-secondary/40">
+              <Avatar className="h-9 w-9 border border-border">
+                <AvatarFallback className="bg-secondary text-xs font-semibold text-secondary-foreground">
+                  {initials}
+                </AvatarFallback>
+              </Avatar>
+              <div className="flex flex-col">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-sm font-semibold text-foreground">
+                    {other.name}
+                  </span>
+                  {other.verified && (
+                    <ShieldCheck className="h-3.5 w-3.5 text-primary" />
+                  )}
+                </div>
+                <span className="text-[10px] text-muted-foreground">
+                  {other.tripsCompleted} trips completed
+                </span>
+              </div>
+            </button>
+          </DrawerTrigger>
+          <DrawerContent className="border-border bg-card">
+            <DrawerHeader>
+              <DrawerTitle className="text-foreground">{other.name}</DrawerTitle>
+            </DrawerHeader>
+            <div className="space-y-2 px-4 pb-6 text-sm text-muted-foreground">
+              <p>
+                <span className="font-medium text-foreground">Age:</span> {other.age}
+              </p>
+              <p>
+                <span className="font-medium text-foreground">Gender:</span>{" "}
+                {other.gender === "prefer-not-to-say"
+                  ? "Not specified"
+                  : other.gender.charAt(0).toUpperCase() + other.gender.slice(1)}
+              </p>
+              <p>
+                <span className="font-medium text-foreground">University:</span>{" "}
+                {other.university || "Not specified"}
+              </p>
+              <p>
+                <span className="font-medium text-foreground">Trips Completed:</span>{" "}
+                {other.tripsCompleted || 0}
+              </p>
+            </div>
+          </DrawerContent>
+        </Drawer>
       </div>
 
       {/* Messages */}

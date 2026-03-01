@@ -7,6 +7,7 @@ export interface User {
   name: string
   age: number
   gender: Gender
+  university?: string
   avatar: string
   bio: string
   verified: boolean
