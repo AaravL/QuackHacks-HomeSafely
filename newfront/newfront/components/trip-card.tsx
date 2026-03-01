@@ -149,12 +149,16 @@ export function TripCard({ trip, user, onRequestJoin, isOwn }: TripCardProps) {
 
         {/* Route */}
         <div className="flex flex-col gap-2">
-          <div className="flex items-center gap-2 rounded-lg bg-secondary/50 px-3 py-2.5">
-            <MapPin className="h-3.5 w-3.5 shrink-0 text-primary" />
-            <span className="truncate text-sm text-foreground">{trip.from}</span>
-            <ArrowRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-            <MapPin className="h-3.5 w-3.5 shrink-0 text-destructive" />
-            <span className="truncate text-sm text-foreground">{trip.to}</span>
+          <div className="flex flex-col gap-2 rounded-lg bg-secondary/50 px-3 py-2.5">
+            <div className="flex items-center gap-2 min-w-0">
+              <MapPin className="h-3.5 w-3.5 shrink-0 text-primary" />
+              <span className="truncate text-sm text-foreground">{trip.from}</span>
+            </div>
+            <div className="flex items-center gap-2 min-w-0">
+              <ArrowRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+              <MapPin className="h-3.5 w-3.5 shrink-0 text-destructive" />
+              <span className="truncate text-sm text-foreground">{trip.to}</span>
+            </div>
           </div>
           {trip.tripDistance && (
             <div className="flex items-center gap-1.5 px-3 text-xs text-muted-foreground">
