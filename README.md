@@ -1,4 +1,4 @@
-# HomeSafely 🚶‍♀️
+# Hitch 🚶‍♀️
 
 **Find safe travel companions for your commute.**
 
