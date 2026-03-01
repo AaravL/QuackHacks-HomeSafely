@@ -66,12 +66,8 @@ export function TripCard({ trip, user, onRequestJoin, isOwn }: TripCardProps) {
   const mode = modeConfig[trip.transportMode]
   const ModeIcon = mode.icon
   const departureDate = new Date(trip.departureTime)
-  const isUpcoming = departureDate > new Date()
-  const timeLabel = isUpcoming
-    ? `in ${formatDistanceToNow(departureDate)}`
-    : `${formatDistanceToNow(departureDate)} ago`
   
-  // Show time in EST
+  // Show departure time in EST
   const estTimeStr = formatInTimeZone(departureDate, 'America/New_York', 'MMM d, h:mm a zzz')
 
   const visibilityParts: string[] = []
@@ -272,9 +268,8 @@ export function TripCard({ trip, user, onRequestJoin, isOwn }: TripCardProps) {
             <div className="flex flex-col gap-0.5 text-xs text-muted-foreground">
               <div className="flex items-center gap-1.5">
                 <Clock className="h-3 w-3" />
-                <span>{timeLabel}</span>
+                <span>Departing at: {estTimeStr}</span>
               </div>
-              <span className="text-xs text-muted-foreground/70">{estTimeStr}</span>
             </div>
             {!isOwn && (
               <Button
@@ -285,7 +280,7 @@ export function TripCard({ trip, user, onRequestJoin, isOwn }: TripCardProps) {
                 Request to Join
               </Button>
             )}
-            {isOwn && !isUpcoming && trip.status !== "completed" && (
+            {isOwn && trip.status !== "completed" && (
               <Button
                 size="sm"
                 onClick={() => setShowCompletionModal(true)}
@@ -297,11 +292,6 @@ export function TripCard({ trip, user, onRequestJoin, isOwn }: TripCardProps) {
             {isOwn && trip.status === "completed" && (
               <Badge variant="secondary" className="text-xs bg-green-100 text-green-800">
                 Completed
-              </Badge>
-            )}
-            {isOwn && isUpcoming && (
-              <Badge variant="outline" className="text-xs text-muted-foreground">
-                Your trip
               </Badge>
             )}
           </div>

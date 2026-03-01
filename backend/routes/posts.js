@@ -47,6 +47,7 @@ router.get('/', async (req, res) => {
       SELECT
         p.*,
         TO_VARCHAR(CONVERT_TIMEZONE('UTC', p.CREATED_AT), 'YYYY-MM-DD"T"HH24:MI:SS.FF3"Z"') AS CREATED_AT_UTC,
+        TO_VARCHAR(CONVERT_TIMEZONE('UTC', p.DEPARTURE_TIME), 'YYYY-MM-DD"T"HH24:MI:SS.FF3"Z"') AS DEPARTURE_TIME_UTC,
         u.NAME,
         u.AGE,
         u.GENDER,
@@ -158,6 +159,7 @@ router.post('/', async (req, res) => {
   try {
     const { 
       userId, startLat, startLng, endLat, endLng, startLocation, destination, mode,
+      departureTime, notes,
       visibleToGender, visibleToAgeMin, visibleToAgeMax, visibleToUniversity 
     } = req.body;
 
@@ -182,10 +184,10 @@ router.post('/', async (req, res) => {
       INSERT INTO POSTS (
         USER_ID, START_LAT, START_LNG, END_LAT, END_LNG,
         ${startLocation ? 'START_LOCATION,' : ''}
-        DESTINATION, MODE, IS_ACTIVE,
+        DESTINATION, MODE, DEPARTURE_TIME, NOTES, IS_ACTIVE,
         VISIBLE_TO_GENDER, VISIBLE_TO_AGE_MIN, VISIBLE_TO_AGE_MAX, VISIBLE_TO_UNIVERSITY,
         CREATED_AT
-      ) VALUES (?, ?, ?, ?, ?, ${startLocation ? '?,' : ''} ?, ?, TRUE, ?, ?, ?, ?, CURRENT_TIMESTAMP())
+      ) VALUES (?, ?, ?, ?, ?, ${startLocation ? '?,' : ''} ?, ?, ?, ?, TRUE, ?, ?, ?, ?, CURRENT_TIMESTAMP())
     `;
     
     let params = [
@@ -203,6 +205,8 @@ router.post('/', async (req, res) => {
     params.push(
       destination,
       mode || 'hybrid',
+      departureTime || null,
+      notes || null,
       visibleToGender || null,
       visibleToAgeMin || null,
       visibleToAgeMax || null,

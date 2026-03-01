@@ -196,7 +196,7 @@ export async function getTrips(params?: {
       from: row.START_LOCATION || `${row.START_LAT}, ${row.START_LNG}`,
       to: row.DESTINATION ?? 'Unknown',
       transportMode: backendToFrontendMode[row.MODE?.toLowerCase()] ?? 'transit',
-      departureTime: row.CREATED_AT_UTC ?? row.CREATED_AT ?? new Date().toISOString(),
+      departureTime: row.DEPARTURE_TIME_UTC ?? row.DEPARTURE_TIME ?? new Date().toISOString(),
       notes: row.NOTES ?? '',
       createdAt: row.CREATED_AT_UTC ?? row.CREATED_AT ?? new Date().toISOString(),
       status: row.IS_ACTIVE ? 'open' : 'completed',
@@ -231,6 +231,8 @@ export async function createTrip(data: {
   to?: string
   mode?: string
   from?: string
+  departureTime?: string
+  notes?: string
   visibleToGender?: string | null
   visibleToAgeMin?: number | null
   visibleToAgeMax?: number | null
@@ -248,6 +250,8 @@ export async function createTrip(data: {
     startLocation: data.startLocation ?? data.from,
     destination: data.destination ?? data.to ?? '',
     mode: frontendToBackendMode[data.mode ?? ''] ?? 'hybrid',
+    departureTime: data.departureTime ?? null,
+    notes: data.notes ?? null,
     visibleToGender: data.visibleToGender,
     visibleToAgeMin: data.visibleToAgeMin,
     visibleToAgeMax: data.visibleToAgeMax,

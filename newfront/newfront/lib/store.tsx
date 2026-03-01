@@ -480,6 +480,8 @@ useEffect(() => {
       to: trip.to,
       from: trip.from,
       mode: trip.transportMode,
+      departureTime: trip.departureTime,
+      notes: trip.notes,
       visibleToGender: trip.visibleToGender,
       visibleToAgeMin: trip.visibleToAgeMin,
       visibleToAgeMax: trip.visibleToAgeMax,

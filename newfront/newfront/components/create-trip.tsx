@@ -219,6 +219,7 @@ export function CreateTrip() {
                 type="date"
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
+                min={new Date().toISOString().split('T')[0]}
                 className="h-11 border-border bg-secondary pl-10 text-sm text-foreground"
                 required
               />
