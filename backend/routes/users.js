@@ -2,38 +2,80 @@ const express = require("express");
 const router = express.Router();
 const { executeQuery } = require("../services/snowflake");
 
-/**
- * Create user profile
- */
+
 router.post("/", async (req, res) => {
   try {
-    const { account, username, age, gender, university } = req.body;
-
-    if (!account || !username) {
-      return res.status(400).json({ error: "account and username are required" });
-    }
-
-    const insertQuery = `
-      INSERT INTO USERS (ACCOUNT, USERNAME, AGE, GENDER, UNIVERSITY)
-      VALUES (?, ?, ?, ?, ?)
-    `;
-
-    const { randomUUID } = require("crypto");
-    const id = randomUUID();
+    const { email, account, username, age, gender, university } = req.body;
 
     await executeQuery(
-      `INSERT INTO USERS (ID, ACCOUNT, USERNAME, AGE, GENDER, UNIVERSITY) VALUES (?, ?, ?, ?, ?, ?)`,
-      [id, account, username, age ?? null, gender ?? null, university ?? null]
+      `INSERT INTO USERS (EMAIL, ACCOUNT, USERNAME, AGE, GENDER, UNIVERSITY)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [
+        email ?? null,
+        account ?? null,
+        username ?? null,
+        age ?? null,
+        gender ?? null,
+        university ?? null,
+      ]
     );
 
-    res.json({ message: "User created successfully", id });
-      } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: "Failed to create user" });
-      }
+    res.status(201).json({ message: "User created successfully" });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Failed to create user" });
+  }
 });
 
 
+
+
+/**
+ * Get current authenticated user (must come before /:userId)
+ */
+router.get("/me", async (req, res) => {
+  try {
+    const userId = req.user?.userId;
+    if (!userId) return res.status(401).json({ error: "Not authenticated" });
+
+    const results = await executeQuery(
+      `SELECT ID, EMAIL, NAME, ACCOUNT, USERNAME, AGE, GENDER, UNIVERSITY,
+              IS_ONLINE, LAST_SEEN, CREATED_AT
+       FROM USERS WHERE ID = ? LIMIT 1`,
+      [userId]
+    );
+
+    if (!results.length) return res.status(404).json({ error: "User not found" });
+    res.json(results[0]);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Failed to fetch user" });
+  }
+});
+
+
+/**
+ * GET /api/users/lookup?limit=5
+ * Returns the most recently created users (useful for testing)
+ */
+router.get("/lookup", async (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit) || 5;
+
+    const results = await executeQuery(
+      `SELECT ID, USERNAME, ACCOUNT, EMAIL, CREATED_AT
+       FROM USERS
+       ORDER BY CREATED_AT DESC
+       LIMIT ?`,
+      [limit]
+    );
+
+    res.json(results);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: "Failed to lookup users" });
+  }
+});
 
 
 /**
@@ -124,5 +166,12 @@ router.put("/:userId/status", async (req, res) => {
     res.status(500).json({ error: "Failed to update status" });
   }
 });
+
+
+// One important thing — this route **must be added before** `router.get("/:userId")` in the file, otherwise Express will intercept `/lookup` and treat `"lookup"` as a userId, giving you a 404. The `/me` route we added earlier has the same requirement, so the order in your file should be:
+
+// GET /me
+// GET /lookup  
+// GET /:userId
 
 module.exports = router;

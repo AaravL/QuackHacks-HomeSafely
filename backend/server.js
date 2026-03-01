@@ -37,10 +37,10 @@ if (process.env.NODE_ENV !== "production") {
 app.use("/api/auth", require("./routes/auth"));
 
 // Protected routes
-app.use("/api/posts", authMiddleware, require("./routes/posts"));
-app.use("/api/users", authMiddleware, require("./routes/users"));
-app.use("/api/messages", authMiddleware, require("./routes/messages"));
-app.use("/api/recommendations", authMiddleware, require("./routes/recommendations"));
+app.use('/api/posts', require('./routes/posts'));
+app.use('/api/users', require('./routes/users'));
+app.use('/api/messages', require('./routes/messages'));
+app.use('/api/recommendations', require('./routes/recommendations'));
 
 // WebSocket for real-time messaging
 const connectedUsers = new Map();
