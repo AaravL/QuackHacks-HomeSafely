@@ -106,7 +106,7 @@ function mapBackendMessage(m: any, currentUserId: string): Message {
     conversationId: otherUserId, // ← key by other user, not a local conv id
     senderId: String(m.SENDER_ID),
     text: m.CONTENT,
-    timestamp: m.CREATED_AT,
+    timestamp: m.CREATED_AT_UTC ?? m.CREATED_AT,
   }
 }
 
@@ -120,7 +120,7 @@ function mapBackendConversation(row: any, currentUserId: string): Conversation {
     id: otherId, // ← keyed by other user's ID, matches conversationId in messages
     participantIds: [currentUserId, otherId],
     lastMessage: row.LAST_MESSAGE_CONTENT ?? "",
-    lastMessageTime: row.LAST_MESSAGE_TIME ?? new Date().toISOString(),
+    lastMessageTime: row.LAST_MESSAGE_TIME_UTC ?? row.LAST_MESSAGE_TIME ?? new Date().toISOString(),
     unreadCount: 0,
   }
 }
@@ -390,6 +390,10 @@ useEffect(() => {
       to: trip.to,
       from: trip.from,
       mode: trip.transportMode,
+      visibleToGender: trip.visibleToGender,
+      visibleToAgeMin: trip.visibleToAgeMin,
+      visibleToAgeMax: trip.visibleToAgeMax,
+      visibleToUniversity: trip.visibleToUniversity,
     }).catch((err) => {
       console.error("Failed to create trip:", err)
       setTrips((prev) => prev.filter((t) => t.id !== trip.id))

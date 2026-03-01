@@ -196,11 +196,15 @@ export async function getTrips(params?: {
       from: row.START_LOCATION || `${row.START_LAT}, ${row.START_LNG}`,
       to: row.DESTINATION ?? 'Unknown',
       transportMode: backendToFrontendMode[row.MODE?.toLowerCase()] ?? 'transit',
-      departureTime: row.CREATED_AT ?? new Date().toISOString(),
+      departureTime: row.CREATED_AT_UTC ?? row.CREATED_AT ?? new Date().toISOString(),
       notes: row.NOTES ?? '',
-      createdAt: row.CREATED_AT ?? new Date().toISOString(),
+      createdAt: row.CREATED_AT_UTC ?? row.CREATED_AT ?? new Date().toISOString(),
       status: row.IS_ACTIVE ? 'open' : 'completed',
       tripDistance: row.TRIP_DISTANCE ? Math.round(row.TRIP_DISTANCE * 10) / 10 : null,
+      visibleToGender: row.VISIBLE_TO_GENDER ?? null,
+      visibleToAgeMin: row.VISIBLE_TO_AGE_MIN ?? null,
+      visibleToAgeMax: row.VISIBLE_TO_AGE_MAX ?? null,
+      visibleToUniversity: row.VISIBLE_TO_UNIVERSITY ?? null,
       // Extra user fields joined by backend
       userName: row.NAME ?? '',
       userAge: row.AGE ?? null,
@@ -226,6 +230,10 @@ export async function createTrip(data: {
   to?: string
   mode?: string
   from?: string
+  visibleToGender?: string | null
+  visibleToAgeMin?: number | null
+  visibleToAgeMax?: number | null
+  visibleToUniversity?: string | null
 }) {
   const userId = getCurrentUserId()
   if (!userId) throw new Error('Not authenticated')
@@ -239,6 +247,10 @@ export async function createTrip(data: {
     startLocation: data.startLocation ?? data.from,
     destination: data.destination ?? data.to ?? '',
     mode: frontendToBackendMode[data.mode ?? ''] ?? 'hybrid',
+    visibleToGender: data.visibleToGender,
+    visibleToAgeMin: data.visibleToAgeMin,
+    visibleToAgeMax: data.visibleToAgeMax,
+    visibleToUniversity: data.visibleToUniversity,
   }
 
   console.log('[createTrip] Posting to backend:', payload)

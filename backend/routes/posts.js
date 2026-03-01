@@ -19,6 +19,23 @@ function haversine(lat, lng) {
 router.get('/', async (req, res) => {
   try {
     const { sortBy = 'recommendation', userLat, userLng } = req.query;
+    const requestingUserId = req.user?.userId; // from auth middleware
+
+    // Get requesting user's profile to apply visibility filters
+    let requestingUser = null;
+    if (requestingUserId) {
+      try {
+        const userRows = await executeQuery(
+          'SELECT AGE, GENDER, UNIVERSITY FROM USERS WHERE ID = ? LIMIT 1',
+          [requestingUserId]
+        );
+        if (userRows.length > 0) {
+          requestingUser = userRows[0];
+        }
+      } catch (err) {
+        console.log('[posts GET] Could not fetch requesting user profile:', err.message);
+      }
+    }
 
     const lat = parseFloat(userLat);
     const lng = parseFloat(userLng);
@@ -29,9 +46,11 @@ router.get('/', async (req, res) => {
     let query = `
       SELECT
         p.*,
+        TO_VARCHAR(CONVERT_TIMEZONE('UTC', p.CREATED_AT), 'YYYY-MM-DD"T"HH24:MI:SS.FF3"Z"') AS CREATED_AT_UTC,
         u.NAME,
         u.AGE,
         u.GENDER,
+        u.UNIVERSITY,
         u.PROFILE_IMAGE,
         3959 * ACOS(
           LEAST(1.0,
@@ -69,7 +88,64 @@ router.get('/', async (req, res) => {
     }
 
     // No bindings needed — lat/lng are interpolated as validated numbers
-    const results = await executeQuery(query, []);
+    let results = await executeQuery(query, []);
+
+    // Apply visibility filtering on the backend
+    if (requestingUser) {
+      results = results.filter((post) => {
+        // Always allow the poster to see their own post
+        if (String(post.USER_ID) === String(requestingUserId)) {
+          return true;
+        }
+
+        const viewerGender = (requestingUser.GENDER || '').toString().trim().toLowerCase();
+        const postGender = (post.VISIBLE_TO_GENDER || '').toString().trim().toLowerCase();
+
+        const viewerAge = Number.parseInt(requestingUser.AGE, 10);
+        const minAgeRaw = post.VISIBLE_TO_AGE_MIN;
+        const maxAgeRaw = post.VISIBLE_TO_AGE_MAX;
+        const minAge = minAgeRaw == null ? null : Number.parseInt(minAgeRaw, 10);
+        const maxAge = maxAgeRaw == null ? null : Number.parseInt(maxAgeRaw, 10);
+
+        const viewerUniversity = (requestingUser.UNIVERSITY || '').toString().trim().toLowerCase();
+        const posterUniversity = (post.UNIVERSITY || '').toString().trim().toLowerCase();
+        const postUniversityRule = (post.VISIBLE_TO_UNIVERSITY || '').toString().trim().toLowerCase();
+
+        // Gender filter
+        if (postGender && postGender !== 'all' && viewerGender !== postGender) {
+          return false;
+        }
+
+        // Age range filter
+        const hasAgeRule = Number.isFinite(minAge) || Number.isFinite(maxAge);
+        if (hasAgeRule && !Number.isFinite(viewerAge)) {
+          return false;
+        }
+        if (Number.isFinite(minAge) && viewerAge < minAge) {
+          return false;
+        }
+        if (Number.isFinite(maxAge) && viewerAge > maxAge) {
+          return false;
+        }
+
+        // University filter
+        if (postUniversityRule && postUniversityRule !== 'all') {
+          if (!viewerUniversity) {
+            return false;
+          }
+          if (postUniversityRule === 'same') {
+            if (!posterUniversity || viewerUniversity !== posterUniversity) {
+              return false;
+            }
+          } else if (viewerUniversity !== postUniversityRule) {
+            return false;
+          }
+        }
+
+        return true;
+      });
+    }
+
     res.json(results);
   } catch (error) {
     console.error('Error fetching posts:', error);
@@ -80,7 +156,10 @@ router.get('/', async (req, res) => {
 // POST /api/posts
 router.post('/', async (req, res) => {
   try {
-    const { userId, startLat, startLng, endLat, endLng, startLocation, destination, mode } = req.body;
+    const { 
+      userId, startLat, startLng, endLat, endLng, startLocation, destination, mode,
+      visibleToGender, visibleToAgeMin, visibleToAgeMax, visibleToUniversity 
+    } = req.body;
 
     if (!userId || startLat == null || startLng == null || endLat == null || endLng == null || !destination) {
       return res.status(400).json({ error: 'Missing required fields' });
@@ -98,56 +177,82 @@ router.post('/', async (req, res) => {
       [userId]
     );
 
-    // Check if START_LOCATION column exists by trying to use it
-    let query, params;
+    // Try inserting with all columns including visibility filters
+    let query = `
+      INSERT INTO POSTS (
+        USER_ID, START_LAT, START_LNG, END_LAT, END_LNG,
+        ${startLocation ? 'START_LOCATION,' : ''}
+        DESTINATION, MODE, IS_ACTIVE,
+        VISIBLE_TO_GENDER, VISIBLE_TO_AGE_MIN, VISIBLE_TO_AGE_MAX, VISIBLE_TO_UNIVERSITY,
+        CREATED_AT
+      ) VALUES (?, ?, ?, ?, ?, ${startLocation ? '?,' : ''} ?, ?, TRUE, ?, ?, ?, ?, CURRENT_TIMESTAMP())
+    `;
+    
+    let params = [
+      userId,
+      coords[0],
+      coords[1],
+      coords[2],
+      coords[3],
+    ];
+    
     if (startLocation) {
-      // Try with START_LOCATION column (will fail gracefully if column doesn't exist)
-      query = `
-        INSERT INTO POSTS (
-          USER_ID, START_LAT, START_LNG, END_LAT, END_LNG,
-          START_LOCATION, DESTINATION, MODE, IS_ACTIVE, CREATED_AT
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, TRUE, CURRENT_TIMESTAMP())
-      `;
-      params = [
-        userId,
-        coords[0],
-        coords[1],
-        coords[2],
-        coords[3],
-        startLocation,
-        destination,
-        mode || 'hybrid',
-      ];
-    } else {
-      query = `
-        INSERT INTO POSTS (
-          USER_ID, START_LAT, START_LNG, END_LAT, END_LNG,
-          DESTINATION, MODE, IS_ACTIVE, CREATED_AT
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, TRUE, CURRENT_TIMESTAMP())
-      `;
-      params = [
-        userId,
-        coords[0],
-        coords[1],
-        coords[2],
-        coords[3],
-        destination,
-        mode || 'hybrid',
-      ];
+      params.push(startLocation);
     }
+    
+    params.push(
+      destination,
+      mode || 'hybrid',
+      visibleToGender || null,
+      visibleToAgeMin || null,
+      visibleToAgeMax || null,
+      visibleToUniversity || null
+    );
 
     let result;
     try {
       result = await executeQuery(query, params);
     } catch (err) {
-      // If START_LOCATION column doesn't exist, retry without it
-      if (err.message && err.message.includes('START_LOCATION')) {
+      // If visibility columns don't exist, retry without them
+      if (err.message && (err.message.includes('VISIBLE_TO_') || err.message.includes('invalid identifier'))) {
+        console.log('[posts] Visibility filter columns not found, inserting without them');
+        
+        query = `
+          INSERT INTO POSTS (
+            USER_ID, START_LAT, START_LNG, END_LAT, END_LNG,
+            ${startLocation ? 'START_LOCATION,' : ''}
+            DESTINATION, MODE, IS_ACTIVE, CREATED_AT
+          ) VALUES (?, ?, ?, ?, ?, ${startLocation ? '?,' : ''} ?, ?, TRUE, CURRENT_TIMESTAMP())
+        `;
+        
+        params = [
+          userId,
+          coords[0],
+          coords[1],
+          coords[2],
+          coords[3],
+        ];
+        
+        if (startLocation) {
+          params.push(startLocation);
+        }
+        
+        params.push(
+          destination,
+          mode || 'hybrid'
+        );
+        
+        result = await executeQuery(query, params);
+      } else if (err.message && err.message.includes('START_LOCATION')) {
+        // If START_LOCATION column doesn't exist, retry without it
         console.log('[posts] START_LOCATION column not found, inserting without it');
         query = `
           INSERT INTO POSTS (
             USER_ID, START_LAT, START_LNG, END_LAT, END_LNG,
-            DESTINATION, MODE, IS_ACTIVE, CREATED_AT
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, TRUE, CURRENT_TIMESTAMP())
+            DESTINATION, MODE, IS_ACTIVE,
+            VISIBLE_TO_GENDER, VISIBLE_TO_AGE_MIN, VISIBLE_TO_AGE_MAX, VISIBLE_TO_UNIVERSITY,
+            CREATED_AT
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, TRUE, ?, ?, ?, ?, CURRENT_TIMESTAMP())
         `;
         params = [
           userId,
@@ -157,6 +262,10 @@ router.post('/', async (req, res) => {
           coords[3],
           destination,
           mode || 'hybrid',
+          visibleToGender || null,
+          visibleToAgeMin || null,
+          visibleToAgeMax || null,
+          visibleToUniversity || null
         ];
         result = await executeQuery(query, params);
       } else {

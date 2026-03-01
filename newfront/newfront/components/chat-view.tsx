@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect, useMemo } from "react"
 import { format } from "date-fns"
+import { formatInTimeZone } from "date-fns-tz"
 import { ArrowLeft, Send, ShieldCheck } from "lucide-react"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
@@ -114,7 +115,7 @@ export function ChatView() {
                 {msg.text}
               </div>
               <span className="px-1 text-[10px] text-muted-foreground">
-                {format(new Date(msg.timestamp), "h:mm a")}
+                {formatInTimeZone(new Date(msg.timestamp), 'America/New_York', 'h:mm a zzz')}
               </span>
             </div>
           )
