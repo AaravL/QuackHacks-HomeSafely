@@ -4,11 +4,10 @@ import { formatDistanceToNow } from "date-fns"
 import { MessageCircle } from "lucide-react"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { useAppStore } from "@/lib/store"
-import { CURRENT_USER_ID } from "@/lib/mock-data"
 import { cn } from "@/lib/utils"
 
 export function MessagesList() {
-  const { conversations, getUserById, setActiveChatId } = useAppStore()
+  const { conversations, getUserById, setActiveChatId, currentUserId } = useAppStore()
 
   if (conversations.length === 0) {
     return (
@@ -36,7 +35,7 @@ export function MessagesList() {
       <div className="flex flex-col gap-1">
         {conversations.map((conv) => {
           const otherId = conv.participantIds.find(
-            (id) => id !== CURRENT_USER_ID
+            (id) => id !== currentUserId
           )
           const other = otherId ? getUserById(otherId) : undefined
           if (!other) return null

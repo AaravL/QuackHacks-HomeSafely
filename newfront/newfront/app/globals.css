@@ -3,7 +3,7 @@
 
 @custom-variant dark (&:is(.dark *));
 
-/* HomeSafely - dark-first, trust/safety palette */
+/* Hitch - dark-first, trust/safety palette */
 :root {
   --background: oklch(0.14 0.008 250);
   --foreground: oklch(0.95 0.005 250);

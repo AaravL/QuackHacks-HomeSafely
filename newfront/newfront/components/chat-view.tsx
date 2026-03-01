@@ -7,18 +7,17 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { useAppStore } from "@/lib/store"
-import { CURRENT_USER_ID } from "@/lib/mock-data"
 import { cn } from "@/lib/utils"
 
 export function ChatView() {
-  const { activeChatId, setActiveChatId, conversations, messages, getUserById, sendMessage } =
+  const { activeChatId, setActiveChatId, conversations, messages, getUserById, sendMessage, currentUserId } =
     useAppStore()
   const [text, setText] = useState("")
   const scrollRef = useRef<HTMLDivElement>(null)
 
   const conversation = conversations.find((c) => c.id === activeChatId)
   const otherId = conversation?.participantIds.find(
-    (id) => id !== CURRENT_USER_ID
+    (id) => id !== currentUserId
   )
   const other = otherId ? getUserById(otherId) : undefined
 
@@ -95,7 +94,7 @@ export function ChatView() {
         style={{ maxHeight: "calc(100dvh - 230px)" }}
       >
         {chatMessages.map((msg) => {
-          const isMine = msg.senderId === CURRENT_USER_ID
+          const isMine = msg.senderId === currentUserId
           return (
             <div
               key={msg.id}

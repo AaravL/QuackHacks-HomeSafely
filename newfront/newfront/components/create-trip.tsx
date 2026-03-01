@@ -19,7 +19,6 @@ import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent } from "@/components/ui/card"
 import { useAppStore } from "@/lib/store"
-import { CURRENT_USER_ID } from "@/lib/mock-data"
 import type { TransportMode } from "@/lib/types"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
@@ -39,7 +38,7 @@ interface SafetyTip {
 }
 
 export function CreateTrip() {
-  const { addTrip, setActiveTab } = useAppStore()
+  const { addTrip, setActiveTab, currentUserId } = useAppStore()
   const [from, setFrom] = useState("")
   const [to, setTo] = useState("")
   const [mode, setMode] = useState<TransportMode>("walking")
@@ -85,7 +84,7 @@ export function CreateTrip() {
 
     addTrip({
       id: `trip-${Date.now()}`,
-      userId: CURRENT_USER_ID,
+      userId: currentUserId,
       from,
       to,
       transportMode: mode,

@@ -6,6 +6,8 @@ const { executeQuery } = require('../services/snowflake');
 router.get('/', async (req, res) => {
   try {
     const { sortBy = 'recommendation', userId, userLat, userLng } = req.query;
+    const lat = userLat ? parseFloat(userLat) : null;
+    const lng = userLng ? parseFloat(userLng) : null;
 
     let query = `
       SELECT 
@@ -13,8 +15,15 @@ router.get('/', async (req, res) => {
         u.NAME,
         u.AGE,
         u.GENDER,
-        u.PROFILE_IMAGE,
-        EARTH_DISTANCE(p.START_LAT, p.START_LNG, ?, ?) as distance
+        u.PROFILE_IMAGE
+    `;
+
+    // Only include distance if coordinates provided
+    if (lat !== null && lng !== null) {
+      query += `, EARTH_DISTANCE(p.START_LAT, p.START_LNG, ?, ?) as distance`;
+    }
+
+    query += `
       FROM POSTS p
       JOIN USERS u ON p.USER_ID = u.ID
       WHERE p.IS_ACTIVE = TRUE
@@ -32,14 +41,19 @@ router.get('/', async (req, res) => {
         query += ' ORDER BY p.CREATED_AT ASC';
         break;
       case 'closest':
-        query += ` ORDER BY EARTH_DISTANCE(p.START_LAT, p.START_LNG, ${userLat}, ${userLng}) ASC`;
+        if (lat !== null && lng !== null) {
+          query += ` ORDER BY EARTH_DISTANCE(p.START_LAT, p.START_LNG, ?, ?) ASC`;
+        } else {
+          query += ' ORDER BY p.RECOMMENDATION_SCORE DESC';
+        }
         break;
       case 'recommendation':
       default:
         query += ' ORDER BY p.RECOMMENDATION_SCORE DESC';
     }
 
-    const results = await executeQuery(query, [userLat, userLng]);
+    const bindings = (lat !== null && lng !== null) ? [lat, lng] : [];
+    const results = await executeQuery(query, bindings);
     res.json(results);
   } catch (error) {
     console.error('Error fetching posts:', error);
