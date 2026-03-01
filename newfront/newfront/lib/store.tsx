@@ -16,6 +16,7 @@ import {
   mockMessages,
   CURRENT_USER_ID,
 } from "./mock-data"
+import * as api from "./api"
 
 interface AppState {
   currentUserId: string
@@ -80,16 +81,41 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
   const [activeTab, setActiveTab] = useState<TabId>("feed")
   const [activeChatId, setActiveChatId] = useState<string | null>(null)
 
-  // Hydrate from localStorage on mount
+  // Hydrate from localStorage and fetch from backend on mount
   useEffect(() => {
-    const saved = loadFromStorage()
-    if (saved) {
-      if (saved.users) setUsers(saved.users)
-      if (saved.trips) setTrips(saved.trips)
-      if (saved.conversations) setConversations(saved.conversations)
-      if (saved.messages) setMessages(saved.messages)
+    const loadData = async () => {
+      const saved = loadFromStorage()
+      if (saved) {
+        if (saved.users) setUsers(saved.users)
+        if (saved.trips) setTrips(saved.trips)
+        if (saved.conversations) setConversations(saved.conversations)
+        if (saved.messages) setMessages(saved.messages)
+      }
+
+      // Fetch fresh data from backend
+      try {
+        const fetchedTrips = await api.getTrips()
+        if (fetchedTrips && Array.isArray(fetchedTrips)) {
+          setTrips(fetchedTrips)
+        }
+      } catch (error) {
+        console.error('Failed to fetch trips from backend:', error)
+        // Fall back to mock data already set
+      }
+
+      try {
+        const fetchedConversations = await api.getConversations()
+        if (fetchedConversations && Array.isArray(fetchedConversations)) {
+          setConversations(fetchedConversations)
+        }
+      } catch (error) {
+        console.error('Failed to fetch conversations:', error)
+      }
+
+      setHydrated(true)
     }
-    setHydrated(true)
+
+    loadData()
   }, [])
 
   // Persist to localStorage whenever data changes
@@ -115,7 +141,20 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
   )
 
   const addTrip = useCallback((trip: Trip) => {
-    setTrips((prev) => [trip, ...prev])
+    // Create trip via API
+    api.createTrip({
+      startLocation: trip.startLocation,
+      endLocation: trip.endLocation,
+      departureTime: trip.departureTime,
+      description: trip.description,
+      preferences: trip.preferences,
+    }).then(createdTrip => {
+      setTrips((prev) => [createdTrip, ...prev])
+    }).catch(error => {
+      console.error('Failed to create trip:', error)
+      // Optimistically add to UI
+      setTrips((prev) => [trip, ...prev])
+    })
   }, [])
 
   const sendMessage = useCallback(
@@ -127,6 +166,13 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
         text,
         timestamp: new Date().toISOString(),
       }
+      
+      // Send via API
+      api.sendMessage(conversationId, text).catch(error => {
+        console.error('Failed to send message:', error)
+      })
+      
+      // Optimistically update UI
       setMessages((prev) => [...prev, newMsg])
       setConversations((prev) =>
         prev.map((c) =>
@@ -140,6 +186,12 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
   )
 
   const updateProfile = useCallback((updates: Partial<User>) => {
+    // Update via API
+    api.updateProfile(updates).catch(error => {
+      console.error('Failed to update profile:', error)
+    })
+    
+    // Optimistically update UI
     setUsers((prev) =>
       prev.map((u) =>
         u.id === CURRENT_USER_ID ? { ...u, ...updates } : u
@@ -164,6 +216,11 @@ export function AppStoreProvider({ children }: { children: ReactNode }) {
         setActiveTab("messages")
         return
       }
+
+      // Join trip via API
+      api.joinTrip(tripId).catch(error => {
+        console.error('Failed to join trip:', error)
+      })
 
       const newConv: Conversation = {
         id: `conv-${Date.now()}`,
