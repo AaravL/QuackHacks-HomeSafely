@@ -23,8 +23,11 @@ export function TripFeed() {
   const [activeFilter, setActiveFilter] = useState<TransportMode | "all">("all")
 
   const filteredTrips = useMemo(() => {
-    return trips
-      .filter((t) => t.status === "open")
+    console.log('[TripFeed] All trips:', trips.length)
+    console.log('[TripFeed] Trip statuses:', trips.map(t => ({ id: t.id, status: t.status, to: t.to })))
+    const open = trips.filter((t) => t.status === "open")
+    console.log('[TripFeed] Open trips:', open.length)
+    return open
       .filter((t) => {
         if (activeFilter !== "all" && t.transportMode !== activeFilter)
           return false
@@ -109,6 +112,7 @@ export function TripFeed() {
             </p>
           </div>
         )}
+        {filteredTrips.length > 0 && console.log('[TripFeed] Rendering', filteredTrips.length, 'trips')}
         {filteredTrips.map((trip) => (
           <TripCard
             key={trip.id}

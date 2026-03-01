@@ -223,8 +223,39 @@ useEffect(() => {
   // ── Poll trips every 10 s ────────────────────────────────────────────────────
   useEffect(() => {
     const id = setInterval(async () => {
-      const fetched = await api.getTrips({ sortBy: "recommendation" })
-      if (Array.isArray(fetched)) setTrips(fetched as Trip[])
+      try {
+        const fetched = await api.getTrips({ sortBy: "recommendation" })
+        console.log('[Store] getTrips returned:', fetched?.length || 0, 'trips', fetched)
+        if (Array.isArray(fetched)) {
+          console.log('[Store] Setting trips from API:', fetched)
+          setTrips(fetched as Trip[])
+          
+          // Extract users from trip data and add them to the store
+          const tripUsers = fetched.map((trip: any) => ({
+            id: trip.userId,
+            name: trip.userName || 'Unknown User',
+            age: trip.userAge || null,
+            gender: normalizeGender(trip.userGender),
+            avatar: trip.userAvatar || '',
+            bio: '',
+            verified: true,
+            tripsCompleted: 0,
+            rating: 5,
+          }))
+          
+          setUsers((prev) => {
+            const userMap = new Map(prev.map(u => [u.id, u]))
+            tripUsers.forEach(u => {
+              if (!userMap.has(u.id)) {
+                userMap.set(u.id, u)
+              }
+            })
+            return Array.from(userMap.values())
+          })
+        }
+      } catch (error) {
+        console.error('[Store] Error fetching trips:', error)
+      }
     }, 10_000)
     return () => clearInterval(id)
   }, [])

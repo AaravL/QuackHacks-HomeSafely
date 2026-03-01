@@ -173,14 +173,24 @@ export async function getTrips(params?: {
     if (params?.userLat != null) searchParams.append('userLat', String(params.userLat))
     if (params?.userLng != null) searchParams.append('userLng', String(params.userLng))
 
-    const res = await fetch(`${API_BASE_URL}/posts?${searchParams}`, {
+    const url = `${API_BASE_URL}/posts?${searchParams}`
+    console.log('[api.getTrips] Fetching from:', url)
+    const res = await fetch(url, {
       headers: getAuthHeaders(),
     })
-    if (!res.ok) return null
+    console.log('[api.getTrips] Response status:', res.status)
+    if (!res.ok) {
+      console.error('[api.getTrips] Not OK:', res.status, res.statusText)
+      return null
+    }
     const data = await res.json()
-    if (!Array.isArray(data)) return null
+    console.log('[api.getTrips] Raw data from backend:', data?.length || 0, 'items', data)
+    if (!Array.isArray(data)) {
+      console.error('[api.getTrips] Response is not array:', typeof data)
+      return null
+    }
 
-    return data.map((row: any) => ({
+    const mapped = data.map((row: any) => ({
       id: String(row.ID),
       userId: String(row.USER_ID),
       from: `${row.START_LAT}, ${row.START_LNG}`,
@@ -196,7 +206,10 @@ export async function getTrips(params?: {
       userGender: row.GENDER ?? '',
       userAvatar: row.PROFILE_IMAGE ?? '',
     }))
-  } catch {
+    console.log('[api.getTrips] Mapped to', mapped.length, 'trips:', mapped)
+    return mapped
+  } catch (error) {
+    console.error('[api.getTrips] Error:', error)
     return null
   }
 }
