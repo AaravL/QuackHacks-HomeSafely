@@ -31,7 +31,12 @@ interface AppStore extends AppState {
   setActiveChatId: (id: string | null) => void
   currentUser: User
   getUserById: (id: string) => User | undefined
-  addTrip: (trip: Trip) => void
+  addTrip: (trip: Trip, coords?: {
+    startLat?: number
+    startLng?: number
+    endLat?: number
+    endLng?: number
+  }) => void
   sendMessage: (recipientId: string, text: string) => void
   updateProfile: (updates: Partial<User>) => void
   requestToJoin: (tripId: string) => void
@@ -368,9 +373,19 @@ useEffect(() => {
 
   // ── Actions ──────────────────────────────────────────────────────────────────
 
-  const addTrip = useCallback((trip: Trip) => {
+  const addTrip = useCallback((trip: Trip, coords?: {
+    startLat?: number
+    startLng?: number
+    endLat?: number
+    endLng?: number
+  }) => {
     setTrips((prev) => [trip, ...prev])
     api.createTrip({
+      startLat: coords?.startLat,
+      startLng: coords?.startLng,
+      endLat: coords?.endLat,
+      endLng: coords?.endLng,
+      startLocation: trip.from,
       destination: trip.to,
       to: trip.to,
       from: trip.from,

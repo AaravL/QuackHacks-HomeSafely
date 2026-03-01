@@ -112,7 +112,6 @@ export function TripFeed() {
             </p>
           </div>
         )}
-        {filteredTrips.length > 0 && console.log('[TripFeed] Rendering', filteredTrips.length, 'trips')}
         {filteredTrips.map((trip) => (
           <TripCard
             key={trip.id}

@@ -193,13 +193,14 @@ export async function getTrips(params?: {
     const mapped = data.map((row: any) => ({
       id: String(row.ID),
       userId: String(row.USER_ID),
-      from: `${row.START_LAT}, ${row.START_LNG}`,
+      from: row.START_LOCATION || `${row.START_LAT}, ${row.START_LNG}`,
       to: row.DESTINATION ?? 'Unknown',
       transportMode: backendToFrontendMode[row.MODE?.toLowerCase()] ?? 'transit',
       departureTime: row.CREATED_AT ?? new Date().toISOString(),
       notes: row.NOTES ?? '',
       createdAt: row.CREATED_AT ?? new Date().toISOString(),
       status: row.IS_ACTIVE ? 'open' : 'completed',
+      tripDistance: row.TRIP_DISTANCE ? Math.round(row.TRIP_DISTANCE * 10) / 10 : null,
       // Extra user fields joined by backend
       userName: row.NAME ?? '',
       userAge: row.AGE ?? null,
@@ -220,6 +221,7 @@ export async function createTrip(data: {
   startLng?: number
   endLat?: number
   endLng?: number
+  startLocation?: string
   destination?: string
   to?: string
   mode?: string
@@ -234,6 +236,7 @@ export async function createTrip(data: {
     startLng: Number(data.startLng ?? -74.006),
     endLat:   Number(data.endLat   ?? 40.7138),
     endLng:   Number(data.endLng   ?? -74.001),
+    startLocation: data.startLocation ?? data.from,
     destination: data.destination ?? data.to ?? '',
     mode: frontendToBackendMode[data.mode ?? ''] ?? 'hybrid',
   }

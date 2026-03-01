@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent } from "@/components/ui/card"
+import { LocationPicker } from "@/components/location-picker"
 import { useAppStore } from "@/lib/store"
 import type { TransportMode } from "@/lib/types"
 import { cn } from "@/lib/utils"
@@ -40,7 +41,11 @@ interface SafetyTip {
 export function CreateTrip() {
   const { addTrip, setActiveTab, currentUserId } = useAppStore()
   const [from, setFrom] = useState("")
+  const [fromLat, setFromLat] = useState(40.7128)
+  const [fromLng, setFromLng] = useState(-74.006)
   const [to, setTo] = useState("")
+  const [toLat, setToLat] = useState(40.7138)
+  const [toLng, setToLng] = useState(-74.001)
   const [mode, setMode] = useState<TransportMode>("walking")
   const [date, setDate] = useState("")
   const [time, setTime] = useState("")
@@ -92,9 +97,14 @@ export function CreateTrip() {
       notes,
       createdAt: new Date().toISOString(),
       status: "open",
+    }, {
+      startLat: fromLat,
+      startLng: fromLng,
+      endLat: toLat,
+      endLng: toLng,
     })
 
-    toast.success("Trip posted successfully!")
+    toast.success("Trip posted! (Your previous trip was replaced)")
     setFrom("")
     setTo("")
     setMode("walking")
@@ -112,46 +122,34 @@ export function CreateTrip() {
           Post a Trip
         </h1>
         <p className="text-xs text-muted-foreground">
-          Find a companion for your next journey
+          Find a companion for your next journey • You can only have one active trip at a time
         </p>
       </div>
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
         {/* From */}
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="from" className="text-xs font-medium text-muted-foreground">
-            Starting Point
-          </Label>
-          <div className="relative">
-            <Navigation className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-primary" />
-            <Input
-              id="from"
-              placeholder="Where are you leaving from?"
-              value={from}
-              onChange={(e) => setFrom(e.target.value)}
-              className="h-11 border-border bg-secondary pl-10 text-sm text-foreground placeholder:text-muted-foreground"
-              required
-            />
-          </div>
-        </div>
+        <LocationPicker
+          label="Starting Point"
+          value={from}
+          onChange={(address, lat, lng) => {
+            setFrom(address)
+            setFromLat(lat)
+            setFromLng(lng)
+          }}
+          placeholder="Where are you leaving from?"
+        />
 
         {/* To */}
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="to" className="text-xs font-medium text-muted-foreground">
-            Destination
-          </Label>
-          <div className="relative">
-            <MapPin className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-destructive" />
-            <Input
-              id="to"
-              placeholder="Where are you heading?"
-              value={to}
-              onChange={(e) => setTo(e.target.value)}
-              className="h-11 border-border bg-secondary pl-10 text-sm text-foreground placeholder:text-muted-foreground"
-              required
-            />
-          </div>
-        </div>
+        <LocationPicker
+          label="Destination"
+          value={to}
+          onChange={(address, lat, lng) => {
+            setTo(address)
+            setToLat(lat)
+            setToLng(lng)
+          }}
+          placeholder="Where are you heading?"
+        />
 
         {/* Transport Mode */}
         <div className="flex flex-col gap-1.5">

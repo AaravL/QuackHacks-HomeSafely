@@ -24,6 +24,7 @@ export interface Trip {
   notes: string
   createdAt: string
   status: "open" | "matched" | "completed"
+  tripDistance?: number | null // Distance in miles
 }
 
 export interface Message {
